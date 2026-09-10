@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-10T22:02:54+00:00",
+ "generated_at": "2026-09-10T22:28:07+00:00",
  "source": "http://users.nexustk.com/webreport/PowerAll.htm",
  "power_formula": "vita + 2 * mana",
  "snapshots": 1,
@@ -15,18 +15,18 @@
     {
      "date": "2026-09-10",
      "rank": 86,
-     "power": 7314950,
+     "power": 7315650,
      "vita": 2600200,
-     "mana": 2357375,
-     "lo": 7314950,
-     "hi": 7314950,
+     "mana": 2357725,
+     "lo": 7315650,
+     "hi": 7315650,
      "next": {
       "rank": 85,
       "key": "quistia",
       "name": "Quistia",
       "power": 7342591,
       "skipped": 0,
-      "gap": 27641
+      "gap": 26941
      },
      "unregistered_above": 0,
      "real_rank": 86,
@@ -41,18 +41,18 @@
     {
      "date": "2026-09-10",
      "rank": 114,
-     "power": 6292577,
+     "power": 6293677,
      "vita": 3270051,
-     "mana": 1511263,
-     "lo": 6292577,
-     "hi": 6292577,
+     "mana": 1511813,
+     "lo": 6293677,
+     "hi": 6293677,
      "next": {
       "rank": 113,
       "key": "onixs",
       "name": "Onixs",
       "power": 6319154,
       "skipped": 0,
-      "gap": 26577
+      "gap": 25477
      },
      "unregistered_above": 0,
      "real_rank": 114,
