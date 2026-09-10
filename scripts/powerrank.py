@@ -1,0 +1,564 @@
+#!/usr/bin/env python3
+"""
+powerrank - archive the NexusTK "Top 1000 of Nexus" power ranking and derive
+rank history, power-to-next-rank and "real rank" for the GitHub Pages site.
+
+Commands:
+  fetch   Download today's ranking page and archive it (raw HTML + parsed JSON
+          snapshot). Then look up character stats: always for the tracked
+          players and the players directly above them, and for everyone else
+          on the list whose stats are due for a refresh (stats_refresh_days),
+          up to max_lookups_per_run lookups per run.
+  build   Regenerate data/history.json (daily detail for the tracked players)
+          and data/players.json (rank matrix, current state and last-known
+          power of every player ever seen) from the archived snapshots.
+
+Power is defined as: vita + 2 * mana.
+
+"Real rank" = official rank + the number of players who are missing from
+today's list (unregistered) but whose last-known power is higher. Players
+with hidden stats are bounded by their nearest visible neighbours instead of
+an exact power, which yields a definite count and an uncertain count.
+
+Only the Python standard library is used.
+"""
+import argparse
+import datetime as dt
+import html
+import json
+import os
+import re
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from collections import Counter
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+CONFIG_PATH = ROOT / "config.json"
+DATA_DIR = ROOT / "data"
+RAW_DIR = DATA_DIR / "raw"
+SNAPSHOT_DIR = DATA_DIR / "snapshots"
+HISTORY_PATH = DATA_DIR / "history.json"
+PLAYERS_PATH = DATA_DIR / "players.json"
+
+RANKING_URL = "http://users.nexustk.com/webreport/PowerAll.htm"
+# Character pages are static files. Fetching them directly avoids the two-hop
+# redirect (through a CGI script) behind http://users.nexustk.com/?name=...
+CHARACTER_URL = "http://users.nexustk.com/userfiles/{key}.html"
+USER_AGENT = "powerrank-archiver/1.0 (daily ranking archive for a GitHub Pages site)"
+TIMEOUT_SECONDS = 30
+# Optional on-disk cache of fetched pages (--cache-dir / POWERRANK_CACHE_DIR) so
+# development and testing never hit the site more than once per page.
+CACHE_DIR = None
+
+DEFAULTS = {
+    "request_delay_seconds": 1.0,
+    "stats_refresh_days": 1,
+    "max_lookups_per_run": 1100,
+    "max_lookups_above": 10,
+    "max_consecutive_errors": 20,
+    "min_rows": 500,
+    "real_rank_max_absent_days": None,
+}
+
+# One ranking row looks like:
+# <tr><td ...><span class="big">86.</span></td>
+#     <td><a class="link" href="http://users.nexustk.com/?name=inkey" ...>Guardian Inkey (Sa San)</a></td></tr>
+ROW_RE = re.compile(
+    r'<span class="big">\s*(\d+)\.\s*</span>.*?'
+    r'href="[^"]*\?name=([^"&]+)"[^>]*>(.*?)</a>',
+    re.S | re.I,
+)
+# "Guardian Inkey (Sa San)" or "Sa San (W) ohyes (Sa San)" -> title / name / level
+DISPLAY_RE = re.compile(r"^(?P<title>.*?)\s*(?P<name>\S+)\s*\((?P<level>[^)]*)\)\s*$", re.S)
+# <tr><td width="20%">Vita :</td><td width="80%">2600200</td></tr>
+STAT_RE = r"{label}\s*:\s*</td>\s*<td[^>]*>\s*([\d,]+)"
+NO_PAGE_MARKER = "does not have a current web listing"
+
+
+class NotFound(Exception):
+    """The character page does not exist (HTTP 404)."""
+
+
+def log(message):
+    print(message, file=sys.stderr, flush=True)
+
+
+def rel(path):
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
+def load_config():
+    with CONFIG_PATH.open(encoding="utf-8") as fh:
+        cfg = {**DEFAULTS, **json.load(fh)}
+    if not cfg.get("tracked"):
+        sys.exit("config.json: 'tracked' must list at least one character name")
+    return cfg
+
+
+def write_json(path, payload, indent=1):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=indent, ensure_ascii=False)
+        fh.write("\n")
+
+
+def power(vita, mana):
+    return vita + 2 * mana
+
+
+def parse_date(text):
+    return dt.date.fromisoformat(text)
+
+
+# --------------------------------------------------------------------------- HTTP
+
+
+def cache_paths(url):
+    base = CACHE_DIR / re.sub(r"[^A-Za-z0-9._-]+", "_", url)
+    return base, base.parent / (base.name + ".404")
+
+
+def http_get(url, retries=3, backoff_seconds=5):
+    if CACHE_DIR is not None:
+        body, missing = cache_paths(url)
+        if missing.exists():
+            raise NotFound(url)
+        if body.exists():
+            return body.read_bytes()
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    for attempt in range(1, retries + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+                raw = response.read()
+            if CACHE_DIR is not None:
+                CACHE_DIR.mkdir(parents=True, exist_ok=True)
+                cache_paths(url)[0].write_bytes(raw)
+            return raw
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                if CACHE_DIR is not None:
+                    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+                    cache_paths(url)[1].touch()
+                raise NotFound(url) from exc
+            if attempt == retries:
+                raise
+            log(f"  attempt {attempt}/{retries} failed for {url}: HTTP {exc.code}")
+            time.sleep(backoff_seconds * attempt)
+        except (urllib.error.URLError, OSError) as exc:
+            if attempt == retries:
+                raise
+            log(f"  attempt {attempt}/{retries} failed for {url}: {exc}")
+            time.sleep(backoff_seconds * attempt)
+
+
+def decode(raw):
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw.decode("latin-1")
+
+
+# --------------------------------------------------------------------------- parsing
+
+
+def split_display(display, key):
+    """Split 'Title Name (Level)' into its parts, using the URL key to locate the name."""
+    match = DISPLAY_RE.match(display)
+    if match and match.group("name").lower() == key:
+        return match.group("title").strip(), match.group("name"), match.group("level").strip()
+    tokens = display.split()
+    for index, token in enumerate(tokens):
+        if token.lower() == key:
+            title = " ".join(tokens[:index])
+            level = " ".join(tokens[index + 1:]).strip("() ")
+            return title, token, level
+    return "", key, ""
+
+
+def parse_rankings(text):
+    """Ordered list of ranked rows. Ties share a rank number (competition ranking)."""
+    rows = []
+    for chunk in re.split(r"<tr\b", text, flags=re.I)[1:]:
+        match = ROW_RE.search(chunk)
+        if not match:
+            continue
+        rank = int(match.group(1))
+        key = urllib.parse.unquote(match.group(2)).lower()
+        display = html.unescape(re.sub(r"<[^>]+>", "", match.group(3)))
+        display = re.sub(r"\s+", " ", display).strip()
+        title, name, level = split_display(display, key)
+        rows.append({"rank": rank, "key": key, "name": name, "title": title, "level": level})
+    rows.sort(key=lambda row: row["rank"])  # stable: keeps page order within ties
+    return rows
+
+
+def index_by_key(rankings):
+    index = {}
+    for position, row in enumerate(rankings):
+        index.setdefault(row["key"], position)
+    return index
+
+
+def rows_above(rankings, position):
+    """Rows ranked strictly better than rankings[position], nearest first (ties are skipped)."""
+    own_rank = rankings[position]["rank"]
+    for row in reversed(rankings[:position]):
+        if row["rank"] < own_rank:
+            yield row
+
+
+def parse_stats(text):
+    if NO_PAGE_MARKER in text:
+        return {"status": "no_page"}
+    values = {}
+    for label in ("Level", "Vita", "Mana"):
+        match = re.search(STAT_RE.format(label=label), text, re.I)
+        if match:
+            values[label.lower()] = int(match.group(1).replace(",", ""))
+    if "vita" not in values or "mana" not in values:
+        return {"status": "hidden"}
+    values["power"] = power(values["vita"], values["mana"])
+    values["status"] = "ok"
+    return values
+
+
+def fetch_stats(key):
+    url = CHARACTER_URL.format(key=urllib.parse.quote(key))
+    try:
+        return parse_stats(decode(http_get(url, retries=2)))
+    except NotFound:
+        return {"status": "no_page"}
+    except Exception as exc:  # one failing character page must not abort the run
+        return {"status": "error", "error": str(exc)[:200]}
+
+
+# --------------------------------------------------------------------------- fetch
+
+
+def load_previous_checks():
+    """key -> date of the last stats lookup, taken from the previous build's players.json."""
+    if not PLAYERS_PATH.exists():
+        return {}
+    with PLAYERS_PATH.open(encoding="utf-8") as fh:
+        payload = json.load(fh)
+    return {key: p["stats_checked"] for key, p in payload.get("players", {}).items() if p.get("stats_checked")}
+
+
+def cmd_fetch(args):
+    cfg = load_config()
+    now = dt.datetime.now(dt.timezone.utc)
+    date = args.date or now.strftime("%Y-%m-%d")
+    today = parse_date(date)
+
+    log(f"Fetching {RANKING_URL}")
+    raw = http_get(RANKING_URL)
+    rankings = parse_rankings(decode(raw))
+    if len(rankings) < cfg["min_rows"]:
+        sys.exit(f"Parsed only {len(rankings)} rows (< {cfg['min_rows']}); refusing to archive a suspicious page")
+    log(f"Parsed {len(rankings)} ranked characters")
+
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
+    (RAW_DIR / f"{date}.htm").write_bytes(raw)
+
+    positions = index_by_key(rankings)
+    previous = load_previous_checks()
+    budget = cfg["max_lookups_per_run"] if args.max_lookups is None else args.max_lookups
+    stats = {}
+    state = {"errors_in_row": 0, "aborted": False}
+
+    def lookup(row, verbose=False):
+        key = row["key"]
+        if key in stats:
+            return stats[key]
+        if len(stats) >= budget or state["aborted"]:
+            return None
+        time.sleep(cfg["request_delay_seconds"])
+        result = fetch_stats(key)
+        stats[key] = result
+        if result["status"] == "error":
+            state["errors_in_row"] += 1
+            if state["errors_in_row"] >= cfg["max_consecutive_errors"]:
+                state["aborted"] = True
+                log(f"  {state['errors_in_row']} consecutive errors - stopping stat lookups for this run")
+        else:
+            state["errors_in_row"] = 0
+        if verbose:
+            detail = f" power={result['power']}" if result["status"] == "ok" else ""
+            log(f"  {row['name']} (#{row['rank']}): {result['status']}{detail}")
+        return result
+
+    # 1. Tracked players and the players directly above them (walk up past hidden stats).
+    for name in cfg["tracked"]:
+        key = name.lower()
+        if key not in positions:
+            log(f"{name}: not in the top {len(rankings)} today")
+            continue
+        position = positions[key]
+        log(f"{name}: rank {rankings[position]['rank']}")
+        lookup(rankings[position], verbose=True)
+        for attempt, row in enumerate(rows_above(rankings, position)):
+            if attempt >= cfg["max_lookups_above"]:
+                break
+            result = lookup(row, verbose=True)
+            if result is None or result["status"] == "ok":
+                break
+
+    # 2. Everyone else whose stats are due, never-checked first, then the stalest.
+    def due(row):
+        checked = previous.get(row["key"])
+        if not checked:
+            return True
+        try:
+            return (today - parse_date(checked)).days >= cfg["stats_refresh_days"]
+        except ValueError:
+            return True
+
+    candidates = [row for row in rankings if row["key"] not in stats and due(row)]
+    candidates.sort(key=lambda row: (previous.get(row["key"]) or "", row["rank"]))
+    planned = max(0, min(len(candidates), budget - len(stats)))
+    log(f"Refreshing stats for {planned} of {len(candidates)} due players ({len(rankings) - len(candidates) - len(stats)} fresh, skipped)")
+    for count, row in enumerate(candidates, 1):
+        if lookup(row) is None:
+            break
+        if count % 100 == 0:
+            log(f"  ...{count} lookups done")
+    log(f"Stats lookups: {dict(Counter(result['status'] for result in stats.values()))}")
+
+    snapshot = {
+        "date": date,
+        "fetched_at": now.replace(microsecond=0).isoformat(),
+        "source": RANKING_URL,
+        "count": len(rankings),
+        "rankings": rankings,
+        "stats": stats,
+    }
+    path = SNAPSHOT_DIR / f"{date}.json"
+    write_json(path, snapshot, indent=None if len(stats) > 50 else 1)
+    log(f"Wrote {rel(path)}")
+
+
+# --------------------------------------------------------------------------- build
+
+
+def compute_bounds(rankings, stats):
+    """key -> (lo, hi) power bounds for every row on the list.
+
+    Visible stats give exact bounds. Otherwise the nearest visible player above
+    gives hi (None = unbounded) and the nearest visible player below gives lo
+    (0 = unknown). Tied ranks mean equal power, so a visible tie partner gives
+    an exact value.
+    """
+    n = len(rankings)
+    exact = [None] * n
+    for i, row in enumerate(rankings):
+        s = stats.get(row["key"])
+        if s and s["status"] == "ok":
+            exact[i] = s["power"]
+    tie_power = {}
+    for i, row in enumerate(rankings):
+        if exact[i] is not None:
+            tie_power.setdefault(row["rank"], exact[i])
+    for i, row in enumerate(rankings):
+        if exact[i] is None and row["rank"] in tie_power:
+            exact[i] = tie_power[row["rank"]]
+
+    above = [None] * n
+    last = None
+    for i in range(n):
+        above[i] = last if exact[i] is None else exact[i]
+        if exact[i] is not None:
+            last = exact[i]
+    below = [0] * n
+    last = 0
+    for i in reversed(range(n)):
+        below[i] = last if exact[i] is None else exact[i]
+        if exact[i] is not None:
+            last = exact[i]
+    return {row["key"]: (below[i], above[i]) for i, row in enumerate(rankings)}
+
+
+def find_next_above(rankings, position, stats):
+    """Nearest better-ranked character whose stats were visible, or None if unknown."""
+    skipped = 0
+    for row in rows_above(rankings, position):
+        row_stats = stats.get(row["key"])
+        if row_stats is None:  # never looked up on that day
+            return None
+        if row_stats["status"] == "ok":
+            return {
+                "rank": row["rank"],
+                "key": row["key"],
+                "name": row["name"],
+                "power": row_stats["power"],
+                "skipped": skipped,
+            }
+        skipped += 1
+    return None
+
+
+def real_rank_counts(lo, hi, absent):
+    """(definite, possible) number of absent players whose power is above the (lo, hi) bounds."""
+    definite = possible = 0
+    for player in absent:
+        if hi is not None and player["lo"] > hi:
+            definite += 1
+        elif player["hi"] is None or player["hi"] > lo:
+            possible += 1
+    return definite, possible
+
+
+def daily_record(date, rankings, position, stats, bounds, absent):
+    row = rankings[position]
+    record = {"date": date, "rank": row["rank"], "power": None, "vita": None, "mana": None}
+    own = stats.get(row["key"])
+    if own and own["status"] == "ok":
+        record.update(vita=own["vita"], mana=own["mana"], power=own["power"])
+    elif own:
+        record["stats_status"] = own["status"]
+    lo, hi = bounds[row["key"]]
+    record["lo"], record["hi"] = lo, hi
+
+    nxt = find_next_above(rankings, position, stats) if row["rank"] > 1 else None
+    if nxt:
+        nxt["gap"] = nxt["power"] - record["power"] if record["power"] is not None else None
+    record["next"] = nxt
+
+    definite, possible = real_rank_counts(lo, hi, absent)
+    record["unregistered_above"] = definite
+    record["real_rank"] = row["rank"] + definite
+    record["real_rank_max"] = row["rank"] + definite + possible
+    return record
+
+
+def load_snapshots():
+    snapshots = []
+    for path in sorted(SNAPSHOT_DIR.glob("*.json")):
+        with path.open(encoding="utf-8") as fh:
+            snapshots.append(json.load(fh))
+    return snapshots
+
+
+def cmd_build(args):
+    cfg = load_config()
+    tracked = [name.lower() for name in cfg["tracked"]]
+    snapshots = load_snapshots()
+    dates = [snapshot["date"] for snapshot in snapshots]
+    window = cfg["real_rank_max_absent_days"]
+
+    players = {}
+    history = {key: [] for key in tracked}
+    absent_keys = []
+
+    for day_index, snapshot in enumerate(snapshots):
+        date = snapshot["date"]
+        rankings = snapshot["rankings"]
+        stats = snapshot.get("stats", {})
+        positions = index_by_key(rankings)
+        bounds = compute_bounds(rankings, stats)
+
+        for position, row in enumerate(rankings):
+            player = players.setdefault(
+                row["key"],
+                {"name": row["name"], "title": row["title"], "first_seen": date, "ranks": [0] * len(dates), "stats": None, "stats_checked": None},
+            )
+            player.update(name=row["name"], title=row["title"], last_seen=date, last_rank=row["rank"])
+            player["ranks"][day_index] = row["rank"]
+            own = stats.get(row["key"])
+            if own and own["status"] != "error":
+                player["stats_checked"] = date
+                player["stats_status"] = own["status"]
+            if own and own["status"] == "ok":
+                player["stats"] = {"date": date, "vita": own["vita"], "mana": own["mana"], "power": own["power"]}
+            player["lo"], player["hi"] = bounds[row["key"]]
+
+        def within_window(player):
+            return window is None or (parse_date(date) - parse_date(player["last_seen"])).days <= window
+
+        absent_keys = [key for key, player in players.items() if key not in positions and within_window(player)]
+        absent = [players[key] for key in absent_keys]
+
+        for key in tracked:
+            if key in positions:
+                history[key].append(daily_record(date, rankings, positions[key], stats, bounds, absent))
+            else:
+                history[key].append({"date": date, "rank": None, "power": None, "next": None})
+
+        if day_index == len(snapshots) - 1:
+            for key, player in players.items():
+                player["today"] = daily_record(date, rankings, positions[key], stats, bounds, absent) if key in positions else None
+
+    generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
+    history_payload = {
+        "generated_at": generated_at,
+        "source": RANKING_URL,
+        "power_formula": "vita + 2 * mana",
+        "snapshots": len(snapshots),
+        "tracked": tracked,
+        "players": {
+            key: {
+                "name": players[key]["name"] if key in players else cfg["tracked"][index],
+                "title": players[key]["title"] if key in players else "",
+                "history": history[key],
+            }
+            for index, key in enumerate(tracked)
+        },
+    }
+    write_json(HISTORY_PATH, history_payload)
+    log(f"Wrote {rel(HISTORY_PATH)} from {len(snapshots)} snapshot(s)")
+
+    write_players(generated_at, dates, tracked, absent_keys, players)
+    present = sum(1 for player in players.values() if player.get("today"))
+    log(f"Wrote {rel(PLAYERS_PATH)}: {len(players)} players known, {present} on the latest list, {len(absent_keys)} absent")
+
+
+def write_players(generated_at, dates, tracked, absent_keys, players):
+    """players.json is large, so it is written compactly with one player per line."""
+    PLAYERS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    compact = {"separators": (",", ":"), "ensure_ascii": False}
+    with PLAYERS_PATH.open("w", encoding="utf-8") as fh:
+        fh.write("{\n")
+        fh.write(f'"generated_at":{json.dumps(generated_at)},\n')
+        fh.write('"power_formula":"vita + 2 * mana",\n')
+        fh.write(f'"dates":{json.dumps(dates)},\n')
+        fh.write(f'"tracked":{json.dumps(tracked)},\n')
+        fh.write(f'"absent":{json.dumps(sorted(absent_keys))},\n')
+        fh.write('"players":{\n')
+        for index, key in enumerate(sorted(players)):
+            separator = "," if index < len(players) - 1 else ""
+            fh.write(f"{json.dumps(key)}:{json.dumps(players[key], **compact)}{separator}\n")
+        fh.write("}\n}\n")
+
+
+# --------------------------------------------------------------------------- main
+
+
+def main(argv=None):
+    global CACHE_DIR
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument(
+        "--cache-dir",
+        default=os.environ.get("POWERRANK_CACHE_DIR"),
+        help="cache fetched pages in this directory (for development; avoids re-hitting the site)",
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+    fetch = sub.add_parser("fetch", help="download and archive today's ranking")
+    fetch.add_argument("--date", help="override the snapshot date (YYYY-MM-DD, default: today UTC)")
+    fetch.add_argument("--max-lookups", type=int, help="override max_lookups_per_run for this run")
+    fetch.set_defaults(func=cmd_fetch)
+    build = sub.add_parser("build", help="rebuild data/history.json and data/players.json from snapshots")
+    build.set_defaults(func=cmd_build)
+    args = parser.parse_args(argv)
+    if args.cache_dir:
+        CACHE_DIR = Path(args.cache_dir)
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

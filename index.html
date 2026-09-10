@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NexusTK Power Rank Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>NexusTK Power Rank Tracker</h1>
+    <p class="sub">
+      Daily snapshots of the
+      <a href="http://users.nexustk.com/webreport/PowerAll.htm" target="_blank" rel="noopener">Top 1000 of Nexus</a>.
+      Power = Vita + 2 &times; Mana.
+      <span id="meta" class="muted"></span>
+    </p>
+  </header>
+
+  <main>
+    <section class="toolbar">
+      <div class="search">
+        <input id="search" type="search" placeholder="Add a character&hellip; type a name" autocomplete="off" spellcheck="false" aria-label="Add a character">
+        <ul id="suggestions" class="suggestions" hidden></ul>
+      </div>
+      <label class="toggle"><input type="checkbox" id="show-real"> Show real rank (dashed)</label>
+      <button id="reset" type="button" class="link-button">Reset to defaults</button>
+    </section>
+
+    <section id="cards" class="cards" aria-live="polite">
+      <p class="muted">Loading&hellip;</p>
+    </section>
+
+    <section class="panel">
+      <h2>Rank over time</h2>
+      <div class="chart-wrap"><canvas id="chart" role="img" aria-label="Line chart of rank over time"></canvas></div>
+    </section>
+
+    <section class="panel">
+      <h2>History</h2>
+      <div class="table-wrap">
+        <table id="history">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="table-footer"><button id="show-all" type="button" class="link-button" hidden></button></p>
+    </section>
+  </main>
+
+  <footer class="muted">
+    <p>
+      <strong>Real rank</strong> adds the players who are missing from today's list (unregistered) but whose
+      last-known power is higher. Players with hidden stats are bounded by their nearest visible neighbours,
+      which can leave an uncertain range.
+      <strong>Power to next</strong> compares against the nearest better-ranked player whose character page shows stats.
+    </p>
+    <p>
+      Rank history is available for every player who has appeared on the list. Daily power detail (the extra table
+      columns) is only recorded for the players listed in <code>config.json</code>.
+      Data: <a href="data/history.json">history.json</a>, <a href="data/players.json">players.json</a>, snapshots in <code>data/snapshots/</code>.
+    </p>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

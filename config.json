@@ -1,0 +1,10 @@
+{
+  "tracked": ["Inkey", "Aero"],
+  "request_delay_seconds": 1.0,
+  "stats_refresh_days": 1,
+  "max_lookups_per_run": 1100,
+  "max_lookups_above": 10,
+  "max_consecutive_errors": 20,
+  "min_rows": 500,
+  "real_rank_max_absent_days": null
+}
