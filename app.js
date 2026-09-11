@@ -8,9 +8,9 @@
   const fmt = (n) => (n == null ? "—" : numberFormat.format(n));
   const charUrl = (key) => `http://users.nexustk.com/?name=${encodeURIComponent(key)}`;
 
-  // data.players: players.json (rank matrix + current state for everyone)
-  // data.hist:    history.json (daily power detail for players tracked in config.json)
-  const data = { players: null, hist: null };
+  // data.players: players.json - per-player daily series (rank, gap to next, real-rank
+  // extras) plus current state for every player who has ever appeared on the list.
+  const data = { players: null };
   let selected = [];
   let chart = null;
   let showAllRows = false;
@@ -36,10 +36,6 @@
     return data.players.players[key];
   }
 
-  function isTracked(key) {
-    return Boolean(data.hist && data.hist.players[key]);
-  }
-
   function color(index) {
     return COLORS[index % COLORS.length];
   }
@@ -47,6 +43,23 @@
   // Rank on the given day index, or null when the player was not on the list.
   function rankOn(p, dayIndex) {
     return p.ranks[dayIndex] || null;
+  }
+
+  // Official rank plus unregistered players definitely above; max includes uncertain ones.
+  function realRankOn(p, dayIndex) {
+    const rank = rankOn(p, dayIndex);
+    return rank == null ? null : { rank: rank + p.unreg[dayIndex], max: rank + p.unreg_max[dayIndex] };
+  }
+
+  // Nearest better-ranked player with visible stats on that day, and the power needed to pass them.
+  function nextOn(p, dayIndex) {
+    const index = p.next[dayIndex];
+    if (!index) return null;
+    const key = data.players.keys[index - 1];
+    const q = player(key);
+    const rank = rankOn(q, dayIndex);
+    const own = rankOn(p, dayIndex);
+    return { key, name: q.name, rank, gap: p.gaps[dayIndex] || null, between: rank != null && own != null ? own - rank - 1 : 0 };
   }
 
   // Change versus the previous day the player was on the list (positive = climbed).
@@ -335,11 +348,6 @@
           el("p", { class: "stats" }, p.stats ? `Last known power ${fmt(p.stats.power)} · Vita ${fmt(p.stats.vita)} · Mana ${fmt(p.stats.mana)} (${p.stats.date})` : "Stats were never visible.")
         );
       }
-      card.append(
-        isTracked(key)
-          ? el("span", { class: "badge", title: "Daily power detail is recorded for this player" }, "tracked in config.json")
-          : el("span", { class: "badge adhoc", title: "Add this name to config.json to record daily power detail" }, "rank history only")
-      );
       cards.append(card);
     });
   }
@@ -368,11 +376,10 @@
         tension: 0.15,
         spanGaps: false,
       });
-      if (showReal && isTracked(key)) {
-        const byDate = new Map(data.hist.players[key].history.map((r) => [r.date, r]));
-        const realPoints = dates.map((date) => {
-          const r = byDate.get(date);
-          return { x: date, y: r && r.real_rank != null ? r.real_rank : null, record: r };
+      if (showReal) {
+        const realPoints = dates.map((date, i) => {
+          const real = realRankOn(p, i);
+          return { x: date, y: real ? real.rank : null, real };
         });
         realPoints.forEach((pt) => pt.y != null && values.push(pt.y));
         datasets.push({
@@ -427,9 +434,9 @@
           tooltip: {
             callbacks: {
               label: (ctx) => {
-                const r = ctx.raw.record;
-                if (r && r.real_rank_max != null && r.real_rank_max !== r.real_rank) {
-                  return `${ctx.dataset.label}: #${r.real_rank}–#${r.real_rank_max}`;
+                const real = ctx.raw.real;
+                if (real && real.max !== real.rank) {
+                  return `${ctx.dataset.label}: #${real.rank}–#${real.max}`;
                 }
                 return `${ctx.dataset.label}: #${ctx.parsed.y}`;
               },
@@ -452,13 +459,13 @@
     for (const key of selected) {
       const p = player(key);
       if (!p) continue;
-      const tracked = isTracked(key);
-      top.append(el("th", { class: "group", colspan: tracked ? 3 : 1 }, p.name));
-      second.append(el("th", { class: "group" }, "Rank"));
-      if (tracked) {
-        second.append(el("th", { title: "Official rank + unregistered players with higher last-known power" }, "Real"), el("th", {}, "Power to next"));
-      }
-      columns.push({ key, p, tracked, records: tracked ? new Map(data.hist.players[key].history.map((r) => [r.date, r])) : null });
+      top.append(el("th", { class: "group", colspan: 3 }, p.name));
+      second.append(
+        el("th", { class: "group" }, "Rank"),
+        el("th", { title: "Official rank + unregistered players with higher last-known power" }, "Real"),
+        el("th", { title: "Power needed to pass the nearest better-ranked player with visible stats" }, "Power to next")
+      );
+      columns.push(p);
     }
     table.tHead.replaceChildren(top, second);
 
@@ -466,35 +473,39 @@
     const visible = showAllRows ? indices : indices.slice(0, TABLE_ROWS);
     const rows = visible.map((dayIndex) => {
       const tr = el("tr", {}, el("td", {}, dates[dayIndex]));
-      for (const column of columns) {
-        const rank = rankOn(column.p, dayIndex);
+      for (const p of columns) {
+        const rank = rankOn(p, dayIndex);
         const rankCell = el("td", { class: "group" });
         if (rank != null) {
           rankCell.append(`#${rank}`);
-          const change = delta(column.p, dayIndex);
+          const change = delta(p, dayIndex);
           if (change != null) rankCell.append(deltaNode(change));
         } else {
           rankCell.append(el("span", { class: "muted" }, "—"));
         }
-        tr.append(rankCell);
-        if (!column.tracked) continue;
 
-        const r = column.records.get(dates[dayIndex]);
+        const real = realRankOn(p, dayIndex);
         const realCell = el("td");
-        if (r && r.real_rank != null) {
-          realCell.append(`#${r.real_rank}`);
-          if (r.real_rank_max != null && r.real_rank_max !== r.real_rank) realCell.append(el("span", { class: "uncertain" }, `–${r.real_rank_max}`));
+        if (real) {
+          realCell.append(`#${real.rank}`);
+          if (real.max !== real.rank) realCell.append(el("span", { class: "uncertain" }, `–${real.max}`));
         } else {
           realCell.append(el("span", { class: "muted" }, "—"));
         }
+
+        const next = rank != null ? nextOn(p, dayIndex) : null;
         const gapCell = el("td");
-        if (r && r.next && r.next.gap != null) {
-          const hidden = r.next.skipped ? `, ${r.next.skipped} hidden skipped` : "";
-          gapCell.append(fmt(r.next.gap), el("span", { class: "target" }, `→ ${r.next.name} (#${r.next.rank}${hidden})`));
+        if (next && next.gap != null) {
+          const between = next.between > 0 ? `, ${next.between} hidden between` : "";
+          gapCell.append(fmt(next.gap), el("span", { class: "target" }, `→ ${next.name} (#${next.rank}${between})`));
+        } else if (rank === 1) {
+          gapCell.append(el("span", { class: "muted" }, "top"));
+        } else if (next) {
+          gapCell.append(el("span", { class: "muted", title: "Own stats hidden" }, `? → ${next.name} (#${next.rank})`));
         } else {
           gapCell.append(el("span", { class: "muted" }, "—"));
         }
-        tr.append(realCell, gapCell);
+        tr.append(rankCell, realCell, gapCell);
       }
       return tr;
     });
@@ -521,18 +532,15 @@
     renderTable();
   }
 
-  async function loadJson(path, optional = false) {
+  async function loadJson(path) {
     const response = await fetch(path, { cache: "no-store" });
-    if (!response.ok) {
-      if (optional) return null;
-      throw new Error(`${path}: HTTP ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`);
     return response.json();
   }
 
   async function main() {
     try {
-      [data.players, data.hist] = await Promise.all([loadJson("data/players.json"), loadJson("data/history.json", true)]);
+      data.players = await loadJson("data/players.json");
     } catch (error) {
       document.getElementById("cards").replaceChildren(el("p", { class: "muted" }, `No data yet (${error.message}). The daily workflow populates the data files.`));
       return;

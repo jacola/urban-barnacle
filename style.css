@@ -148,16 +148,6 @@ code { font-size: 0.9em; }
 .card .gap { font-size: 1.05rem; margin: 4px 0; }
 .card .gap strong { font-size: 1.25rem; }
 .card .stats { font-size: 0.85rem; color: var(--muted); margin: 0; }
-.card .badge {
-  display: inline-block;
-  margin-top: 8px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  background: #eef2ff;
-  color: #3730a3;
-}
-.card .badge.adhoc { background: #f1f5f9; color: var(--muted); }
 .card.absent { border-left-style: dashed; }
 
 .up { color: var(--up); }

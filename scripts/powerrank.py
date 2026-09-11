@@ -23,6 +23,7 @@ an exact power, which yields a definite count and an uncertain count.
 Only the Python standard library is used.
 """
 import argparse
+import bisect
 import datetime as dt
 import html
 import json
@@ -209,7 +210,8 @@ def index_by_key(rankings):
 def rows_above(rankings, position):
     """Rows ranked strictly better than rankings[position], nearest first (ties are skipped)."""
     own_rank = rankings[position]["rank"]
-    for row in reversed(rankings[:position]):
+    for index in range(position - 1, -1, -1):
+        row = rankings[index]
         if row["rank"] < own_rank:
             yield row
 
@@ -403,15 +405,20 @@ def find_next_above(rankings, position, stats):
     return None
 
 
-def real_rank_counts(lo, hi, absent):
-    """(definite, possible) number of absent players whose power is above the (lo, hi) bounds."""
-    definite = possible = 0
-    for player in absent:
-        if hi is not None and player["lo"] > hi:
-            definite += 1
-        elif player["hi"] is None or player["hi"] > lo:
-            possible += 1
-    return definite, possible
+class AbsentIndex:
+    """Sorted power bounds of the absent (unregistered) players, for fast real-rank counting."""
+
+    def __init__(self, players):
+        players = list(players)
+        self.lo = sorted(player["lo"] for player in players)
+        self.hi = sorted(player["hi"] for player in players if player["hi"] is not None)
+        self.unbounded = sum(1 for player in players if player["hi"] is None)
+
+    def counts(self, lo, hi):
+        """(definite, possible) number of absent players whose power is above the (lo, hi) bounds."""
+        definite = 0 if hi is None else len(self.lo) - bisect.bisect_right(self.lo, hi)
+        candidates = self.unbounded + len(self.hi) - bisect.bisect_right(self.hi, lo)
+        return definite, max(0, candidates - definite)
 
 
 def daily_record(date, rankings, position, stats, bounds, absent):
@@ -430,7 +437,7 @@ def daily_record(date, rankings, position, stats, bounds, absent):
         nxt["gap"] = nxt["power"] - record["power"] if record["power"] is not None else None
     record["next"] = nxt
 
-    definite, possible = real_rank_counts(lo, hi, absent)
+    definite, possible = absent.counts(lo, hi)
     record["unregistered_above"] = definite
     record["real_rank"] = row["rank"] + definite
     record["real_rank_max"] = row["rank"] + definite + possible
@@ -445,11 +452,28 @@ def load_snapshots():
     return snapshots
 
 
+def new_player(row, date, n_days):
+    return {
+        "name": row["name"],
+        "title": row["title"],
+        "first_seen": date,
+        "stats": None,
+        "stats_checked": None,
+        # Per-day series aligned with "dates". 0 = not on the list / unknown.
+        "ranks": [0] * n_days,
+        "gaps": [0] * n_days,  # power needed to pass the next visible player
+        "next": [None] * n_days,  # key of that player (converted to a 1-based index into "keys")
+        "unreg": [0] * n_days,  # unregistered players definitely above
+        "unreg_max": [0] * n_days,  # ... including uncertain ones
+    }
+
+
 def cmd_build(args):
     cfg = load_config()
     tracked = [name.lower() for name in cfg["tracked"]]
     snapshots = load_snapshots()
     dates = [snapshot["date"] for snapshot in snapshots]
+    n_days = len(dates)
     window = cfg["real_rank_max_absent_days"]
 
     players = {}
@@ -463,11 +487,10 @@ def cmd_build(args):
         positions = index_by_key(rankings)
         bounds = compute_bounds(rankings, stats)
 
-        for position, row in enumerate(rankings):
-            player = players.setdefault(
-                row["key"],
-                {"name": row["name"], "title": row["title"], "first_seen": date, "ranks": [0] * len(dates), "stats": None, "stats_checked": None},
-            )
+        for row in rankings:
+            player = players.get(row["key"])
+            if player is None:
+                player = players[row["key"]] = new_player(row, date, n_days)
             player.update(name=row["name"], title=row["title"], last_seen=date, last_rank=row["rank"])
             player["ranks"][day_index] = row["rank"]
             own = stats.get(row["key"])
@@ -482,17 +505,34 @@ def cmd_build(args):
             return window is None or (parse_date(date) - parse_date(player["last_seen"])).days <= window
 
         absent_keys = [key for key, player in players.items() if key not in positions and within_window(player)]
-        absent = [players[key] for key in absent_keys]
+        absent = AbsentIndex(players[key] for key in absent_keys)
+        last_day = day_index == n_days - 1
 
+        for position, row in enumerate(rankings):
+            record = daily_record(date, rankings, position, stats, bounds, absent)
+            player = players[row["key"]]
+            if record["next"]:
+                player["next"][day_index] = record["next"]["key"]
+                if record["next"]["gap"] is not None:
+                    player["gaps"][day_index] = record["next"]["gap"]
+            player["unreg"][day_index] = record["unregistered_above"]
+            player["unreg_max"][day_index] = record["real_rank_max"] - record["rank"]
+            if row["key"] in history:
+                history[row["key"]].append(record)
+            if last_day:
+                player["today"] = record
         for key in tracked:
-            if key in positions:
-                history[key].append(daily_record(date, rankings, positions[key], stats, bounds, absent))
-            else:
+            if key not in positions:
                 history[key].append({"date": date, "rank": None, "power": None, "next": None})
-
-        if day_index == len(snapshots) - 1:
+        if last_day:
             for key, player in players.items():
-                player["today"] = daily_record(date, rankings, positions[key], stats, bounds, absent) if key in positions else None
+                if key not in positions:
+                    player["today"] = None
+
+    keys = sorted(players)
+    key_index = {key: index + 1 for index, key in enumerate(keys)}  # 1-based; 0 = none
+    for player in players.values():
+        player["next"] = [key_index[key] if key else 0 for key in player["next"]]
 
     generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
     history_payload = {
@@ -513,12 +553,12 @@ def cmd_build(args):
     write_json(HISTORY_PATH, history_payload)
     log(f"Wrote {rel(HISTORY_PATH)} from {len(snapshots)} snapshot(s)")
 
-    write_players(generated_at, dates, tracked, absent_keys, players)
+    write_players(generated_at, dates, tracked, absent_keys, keys, players)
     present = sum(1 for player in players.values() if player.get("today"))
     log(f"Wrote {rel(PLAYERS_PATH)}: {len(players)} players known, {present} on the latest list, {len(absent_keys)} absent")
 
 
-def write_players(generated_at, dates, tracked, absent_keys, players):
+def write_players(generated_at, dates, tracked, absent_keys, keys, players):
     """players.json is large, so it is written compactly with one player per line."""
     PLAYERS_PATH.parent.mkdir(parents=True, exist_ok=True)
     compact = {"separators": (",", ":"), "ensure_ascii": False}
@@ -529,8 +569,9 @@ def write_players(generated_at, dates, tracked, absent_keys, players):
         fh.write(f'"dates":{json.dumps(dates)},\n')
         fh.write(f'"tracked":{json.dumps(tracked)},\n')
         fh.write(f'"absent":{json.dumps(sorted(absent_keys))},\n')
+        fh.write(f'"keys":{json.dumps(keys, **compact)},\n')
         fh.write('"players":{\n')
-        for index, key in enumerate(sorted(players)):
+        for index, key in enumerate(keys):
             separator = "," if index < len(players) - 1 else ""
             fh.write(f"{json.dumps(key)}:{json.dumps(players[key], **compact)}{separator}\n")
         fh.write("}\n}\n")

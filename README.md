@@ -20,9 +20,8 @@ on their character pages.
   the character's stats.
 * **Chart** – official rank over time (1 at the top); optional dashed
   real-rank lines.
-* **History table** – rank per day for every selected character; the
-  characters listed in `config.json` also get *Real* and *Power to next*
-  columns.
+* **History table** – rank, real rank and power to next per day for every
+  selected character.
 
 ### Real rank
 
@@ -48,8 +47,8 @@ power.
 | `scripts/powerrank.py` | Stdlib-only Python: `fetch` archives today's data, `build` regenerates the site data. |
 | `data/raw/YYYY-MM-DD.htm` | Raw archived copy of the ranking page. |
 | `data/snapshots/YYYY-MM-DD.json` | Parsed ranking (all 1000 rows) plus every character stat looked up that day. Source of truth. |
-| `data/history.json` | Daily detail (power, next, real rank) for the `config.json` characters. Derived. |
-| `data/players.json` | Rank matrix, current state and last-known power for every player ever seen. Derived. |
+| `data/players.json` | Per-player daily series (rank, power to next, real-rank extras), current state and last-known power for every player ever seen. What the site reads. Derived. |
+| `data/history.json` | Human-readable daily record (stats, next player, real rank) for the `config.json` characters. Derived. |
 | `index.html`, `app.js`, `style.css` | The static site (Chart.js via CDN). |
 | `.github/workflows/fetch.yml` | Daily cron: fetch + build, then commit the result. |
 
@@ -71,7 +70,7 @@ The site is then served at `https://<user>.github.io/<repo>/`.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `tracked` | – | Characters that get daily power detail in `history.json` and are selected by default. Add or remove names at any time; `build` back-fills from the archived snapshots. |
+| `tracked` | – | Characters selected by default on the site; their stats and neighbours are always looked up first, and they get a readable record in `history.json`. Add or remove names at any time; `build` back-fills from the archived snapshots. |
 | `request_delay_seconds` | `1.0` | Pause between requests to the site. |
 | `stats_refresh_days` | `1` | Re-fetch a character page only if the last lookup is at least this many days old. |
 | `max_lookups_per_run` | `1100` | Safety cap on character lookups per run (tracked characters and their neighbours are always looked up first). |
@@ -91,6 +90,10 @@ python3 -m http.server 8000                              # open http://localhost
 `--cache-dir` (or `POWERRANK_CACHE_DIR`) stores every fetched page locally so
 repeated development runs never re-hit the site. `fetch --max-lookups N`
 limits character lookups for a quick run.
+
+`players.json` holds one value per player per day for each series, so it grows
+by roughly 7 MB (about 1 MB gzipped) per year of snapshots. If that ever gets
+unwieldy the series can be split into one file per year.
 
 ### Load on users.nexustk.com
 
