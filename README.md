@@ -2,9 +2,10 @@
 
 A GitHub Pages site that archives the NexusTK
 [Top 1000 of Nexus](http://users.nexustk.com/webreport/PowerAll.htm) power
-ranking once a day and charts the rank of any character over time, including
-how much power they need to reach the next rank and their **real rank**
-(what their rank would be if currently unregistered players were counted).
+ranking (and the per-path Top 250 pages) once a day and charts the rank of any
+character over time, including how much power they need to reach the next
+rank, their rank **within their path**, and their **real rank** (what their
+rank would be if currently unregistered players were counted).
 
 Power is calculated as `vita + 2 * mana`, using the stats that players expose
 on their character pages.
@@ -15,13 +16,17 @@ on their character pages.
   the list; press **×** on a card to remove it. The selection is kept in the
   URL (`#p=inkey,aero`) and in the browser, so links are shareable.
   *Reset to defaults* restores the characters listed in `config.json`.
-* **Cards** – current rank and daily change, real rank (with the list of
-  unregistered players above), power needed to pass the next player, and
-  the character's stats.
-* **Chart** – official rank over time (1 at the top); optional dashed
-  real-rank lines.
-* **History table** – rank, real rank and power to next per day for every
-  selected character.
+* **Overall / Within path** – switches the cards, the "to pass" tables and
+  the chart between the overall Top 1000 and the character's path Top 250
+  (Warriors, Rogues, Mages, Poets). Kept in the URL as `view=path`.
+* **Cards** – current rank and daily change (both overall and within path),
+  real rank (with the list of unregistered players above), the nearest five
+  better-ranked players with visible stats and the power needed to pass each,
+  and the character's stats.
+* **Chart** – rank over time (1 at the top); optional dashed real-rank lines
+  in the overall view.
+* **History table** – overall rank, path rank, real rank and power to next
+  per day for every selected character.
 
 ### Real rank
 
@@ -31,6 +36,14 @@ missing players whose last-known power is higher. For players who hide their
 stats, power is bounded by the nearest visible neighbours, which can produce
 an uncertain range (`#38–#40`). `real_rank_max_absent_days` in `config.json`
 limits how long a missing player keeps counting (default: forever).
+
+### Path rank
+
+The four per-path pages each list a Top 250. They add only a handful of
+characters that are not already in the overall Top 1000, but they reveal each
+player's path and exact rank within it. A player who drops out of the overall
+Top 1000 but is still on a path page is still registered and is not counted
+as unregistered for real rank.
 
 ### Power to next
 
@@ -45,8 +58,8 @@ power.
 | --- | --- |
 | `config.json` | Characters with full daily tracking, and fetch settings. |
 | `scripts/powerrank.py` | Stdlib-only Python: `fetch` archives today's data, `build` regenerates the site data. |
-| `data/raw/YYYY-MM-DD.htm` | Raw archived copy of the ranking page. |
-| `data/snapshots/YYYY-MM-DD.json` | Parsed ranking (all 1000 rows) plus every character stat looked up that day. Source of truth. |
+| `data/raw/YYYY-MM-DD.htm`, `YYYY-MM-DD-<path>.htm` | Raw archived copies of the overall and per-path ranking pages. |
+| `data/snapshots/YYYY-MM-DD.json` | Parsed rankings (overall and per path) plus every character stat looked up that day. Source of truth. |
 | `data/players.json` | Per-player daily series (rank, power to next, real-rank extras), current state and last-known power for every player ever seen. What the site reads. Derived. |
 | `data/history.json` | Human-readable daily record (stats, next player, real rank) for the `config.json` characters. Derived. |
 | `index.html`, `app.js`, `style.css` | The static site (Chart.js via CDN). |
@@ -77,6 +90,7 @@ The site is then served at `https://<user>.github.io/<repo>/`.
 | `max_lookups_above` | `10` | How far to walk up the list past hidden stats to find the "next" player. |
 | `max_consecutive_errors` | `20` | Stop looking up stats for the day after this many consecutive failures. |
 | `min_rows` | `500` | Refuse to archive a ranking page with fewer rows (guards against error pages). |
+| `min_path_rows` | `100` | Skip a per-path page with fewer rows for the day. |
 | `real_rank_max_absent_days` | `null` | Ignore missing players last seen more than this many days ago when computing real rank. |
 
 ## Running locally
@@ -97,8 +111,8 @@ unwieldy the series can be split into one file per year.
 
 ### Load on users.nexustk.com
 
-The daily job makes one request for the ranking page and one request per
-ranked character (~1000 static HTML files, fetched directly from
+The daily job makes five requests for the ranking pages and one request per
+ranked character (~1060 static HTML files, fetched directly from
 `/userfiles/<name>.html` rather than through the redirecting CGI), paced by
 `request_delay_seconds`. Set `stats_refresh_days` to e.g. `7` to spread the
 lookups over a week (~150 per day) if you want to be lighter on the site;

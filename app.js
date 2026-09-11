@@ -3,16 +3,21 @@
 
   const COLORS = ["#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed", "#db2777", "#0891b2", "#65a30d"];
   const STORAGE_KEY = "powerrank.selected";
+  const VIEW_KEY = "powerrank.view";
   const TABLE_ROWS = 30;
   const NEXT_ROWS = 5;
+  const PATH_NAMES = { warrior: "Warrior", rogue: "Rogue", mage: "Mage", poet: "Poet" };
   const numberFormat = new Intl.NumberFormat("en-US");
   const fmt = (n) => (n == null ? "—" : numberFormat.format(n));
   const charUrl = (key) => `http://users.nexustk.com/?name=${encodeURIComponent(key)}`;
+  const pathName = (path) => PATH_NAMES[path] || "Path";
+  const pathPlural = (path) => (PATH_NAMES[path] ? `${PATH_NAMES[path]}s` : "path");
 
-  // data.players: players.json - per-player daily series (rank, gap to next, real-rank
-  // extras) plus current state for every player who has ever appeared on the list.
+  // data.players: players.json - per-player daily series (rank, path rank, gap to next,
+  // real-rank extras) plus current state for every player who has ever appeared on a list.
   const data = { players: null };
   let selected = [];
+  let view = "overall"; // "overall" ranks or "path" (rank within the player's path Top 250)
   let chart = null;
   let showAllRows = false;
 
@@ -46,6 +51,16 @@
     return p.ranks[dayIndex] || null;
   }
 
+  // Rank within the player's path Top 250 on that day, or null.
+  function pathRankOn(p, dayIndex) {
+    return p.path_ranks[dayIndex] || null;
+  }
+
+  // Rank in the current view (overall or within path).
+  function viewRankOn(p, dayIndex) {
+    return view === "path" ? pathRankOn(p, dayIndex) : rankOn(p, dayIndex);
+  }
+
   // Official rank plus unregistered players definitely above; max includes uncertain ones.
   function realRankOn(p, dayIndex) {
     const rank = rankOn(p, dayIndex);
@@ -63,12 +78,12 @@
     return { key, name: q.name, rank, gap: p.gaps[dayIndex] || null, between: rank != null && own != null ? own - rank - 1 : 0 };
   }
 
-  // Change versus the previous day the player was on the list (positive = climbed).
-  function delta(p, dayIndex) {
-    const current = rankOn(p, dayIndex);
+  // Change versus the previous day the player had a value in the series (positive = climbed).
+  function delta(p, dayIndex, series = rankOn) {
+    const current = series(p, dayIndex);
     if (current == null) return null;
     for (let i = dayIndex - 1; i >= 0; i--) {
-      const previous = rankOn(p, i);
+      const previous = series(p, i);
       if (previous != null) return previous - current;
     }
     return null;
@@ -99,7 +114,7 @@
     return { definite, possible };
   }
 
-  // ------------------------------------------------------------------ selection
+  // ------------------------------------------------------------------ selection & view
 
   function readSelection() {
     const fromHash = new URLSearchParams(location.hash.slice(1)).get("p");
@@ -113,26 +128,40 @@
     return [...data.players.tracked];
   }
 
-  function persistSelection() {
+  function readView() {
+    const fromHash = new URLSearchParams(location.hash.slice(1)).get("view");
+    if (fromHash === "path" || fromHash === "overall") return fromHash;
+    try {
+      if (localStorage.getItem(VIEW_KEY) === "path") return "path";
+    } catch (error) {
+      /* ignore */
+    }
+    return "overall";
+  }
+
+  function persistState() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(selected));
+      localStorage.setItem(VIEW_KEY, view);
     } catch (error) {
       /* storage unavailable */
     }
-    const hash = selected.length ? `#p=${selected.join(",")}` : "";
-    window.history.replaceState(null, "", location.pathname + location.search + hash);
+    const params = [];
+    if (selected.length) params.push(`p=${selected.join(",")}`);
+    if (view === "path") params.push("view=path");
+    window.history.replaceState(null, "", location.pathname + location.search + (params.length ? `#${params.join("&")}` : ""));
   }
 
   function addPlayer(key) {
     if (!player(key) || selected.includes(key)) return;
     selected.push(key);
-    persistSelection();
+    persistState();
     render();
   }
 
   function removePlayer(key) {
     selected = selected.filter((k) => k !== key);
-    persistSelection();
+    persistState();
     render();
   }
 
@@ -143,7 +172,15 @@
     } catch (error) {
       /* ignore */
     }
-    persistSelection();
+    persistState();
+    render();
+  }
+
+  function setView(next) {
+    view = next;
+    document.querySelectorAll('input[name="view"]').forEach((input) => (input.checked = input.value === view));
+    document.getElementById("show-real").disabled = view === "path";
+    persistState();
     render();
   }
 
@@ -180,7 +217,9 @@
         list.append(el("li", { class: "empty" }, "No player with that name has appeared on the list."));
       }
       for (const p of rows) {
-        const status = p.today ? `#${p.today.rank}` : `last seen #${p.last_rank} on ${p.last_seen}`;
+        const status = p.today
+          ? [p.today.rank != null ? `#${p.today.rank}` : null, p.today.path_rank != null ? `${pathName(p.path)} #${p.today.path_rank}` : null].filter(Boolean).join(" · ")
+          : `last seen ${p.last_active}`;
         list.append(
           el(
             "li",
@@ -282,14 +321,21 @@
   }
 
   // Better-ranked players with visible stats today, nearest first (ties with own rank excluded).
+  // In the path view only players of the same path count, ordered by their path rank.
   function visibleAbove(p, limit) {
     const own = p.today;
+    const inPath = view === "path";
+    const ownRank = inPath ? own.path_rank : own.rank;
     const rows = [];
+    if (ownRank == null) return rows;
     for (const key of data.players.keys) {
       const q = player(key);
       const t = q.today;
-      if (!t || t.rank >= own.rank || t.power == null) continue;
-      rows.push({ key, name: q.name, rank: t.rank, power: t.power });
+      if (!t || t.power == null) continue;
+      if (inPath && q.path !== p.path) continue;
+      const rank = inPath ? t.path_rank : t.rank;
+      if (rank == null || rank >= ownRank) continue;
+      rows.push({ key, name: q.name, rank, power: t.power });
     }
     rows.sort((a, b) => b.rank - a.rank);
     return rows.slice(0, limit);
@@ -297,9 +343,20 @@
 
   function nextTable(p) {
     const today = p.today;
+    const inPath = view === "path";
+    const ownRank = inPath ? today.path_rank : today.rank;
     const wrap = el("div", { class: "next" });
-    if (today.rank === 1) {
-      wrap.append(el("p", { class: "gap" }, "Top of the list"));
+    if (ownRank == null) {
+      const reason = inPath
+        ? p.path
+          ? `Not in the top 250 ${pathPlural(p.path)} today.`
+          : "Path unknown (not in any path Top 250)."
+        : "Not in the overall top 1000 today.";
+      wrap.append(el("p", { class: "gap muted" }, reason));
+      return wrap;
+    }
+    if (ownRank === 1) {
+      wrap.append(el("p", { class: "gap" }, inPath ? `Top ${pathName(p.path)}` : "Top of the list"));
       return wrap;
     }
     const rows = visibleAbove(p, NEXT_ROWS);
@@ -308,14 +365,20 @@
       return wrap;
     }
     const known = today.power != null;
-    const hiddenBetween = today.rank - rows[0].rank - 1;
+    const hiddenBetween = ownRank - rows[0].rank - 1;
     const table = el(
       "table",
       { class: "next-table" },
       el(
         "thead",
         {},
-        el("tr", {}, el("th", { class: "num" }, "Rank"), el("th", {}, "To pass"), el("th", { class: "num" }, known ? "Power needed" : "Their power"))
+        el(
+          "tr",
+          {},
+          el("th", { class: "num" }, inPath ? `${pathName(p.path)} rank` : "Rank"),
+          el("th", {}, "To pass"),
+          el("th", { class: "num" }, known ? "Power needed" : "Their power")
+        )
       )
     );
     const body = el("tbody");
@@ -333,8 +396,37 @@
     table.append(body);
     wrap.append(table);
     if (!known) wrap.append(el("p", { class: "stats" }, "Own stats are hidden, so the gap is unknown."));
-    else if (hiddenBetween > 0) wrap.append(el("p", { class: "stats" }, `${hiddenBetween} player${hiddenBetween === 1 ? "" : "s"} with hidden stats between #${today.rank} and #${rows[0].rank}.`));
+    else if (hiddenBetween > 0) wrap.append(el("p", { class: "stats" }, `${hiddenBetween} player${hiddenBetween === 1 ? "" : "s"} with hidden stats between #${ownRank} and #${rows[0].rank}.`));
     return wrap;
+  }
+
+  // "#86 ▲1" for the current view, with the other view's rank underneath.
+  function rankHeader(p, lastDay) {
+    const inPath = view === "path";
+    const primary = inPath ? pathRankOn(p, lastDay) : rankOn(p, lastDay);
+    const primaryDelta = delta(p, lastDay, inPath ? pathRankOn : rankOn);
+    const secondary = inPath ? rankOn(p, lastDay) : pathRankOn(p, lastDay);
+    const secondaryDelta = delta(p, lastDay, inPath ? rankOn : pathRankOn);
+
+    const big = el("div", { class: "rank" }, primary == null ? "—" : `#${primary}`);
+    if (primary != null && primaryDelta) big.append(deltaNode(primaryDelta, "small"));
+    if (inPath) big.append(el("small", { class: "muted rank-label" }, p.path ? pathName(p.path) : "path unknown"));
+
+    const sub = el("div", { class: "rank-sub" });
+    if (inPath) {
+      sub.append(secondary == null ? "Not in the overall top 1000" : `Overall #${secondary}`);
+    } else if (!p.path) {
+      sub.append(el("span", { class: "muted" }, "Path unknown (not in any path Top 250)"));
+    } else {
+      sub.append(secondary == null ? `${pathName(p.path)} · not in the top 250` : `${pathName(p.path)} #${secondary}`);
+    }
+    if (secondary != null && secondaryDelta) sub.append(deltaNode(secondaryDelta));
+    return [big, sub];
+  }
+
+  function lastSeenText(p) {
+    const where = p.last_rank != null ? `#${p.last_rank} overall` : p.last_path_rank != null ? `${pathName(p.path)} #${p.last_path_rank}` : "on the lists";
+    return `Not on any list today (unregistered?). Last seen ${where} on ${p.last_active}.`;
   }
 
   function renderCards() {
@@ -363,10 +455,9 @@
 
       const today = p.today;
       if (today) {
-        const rank = el("div", { class: "rank" }, `#${today.rank}`);
-        const change = delta(p, lastDay);
-        if (change) rank.append(deltaNode(change, "small"));
-        card.append(rank, realRankNode(p), nextTable(p));
+        card.append(...rankHeader(p, lastDay));
+        if (today.rank != null) card.append(realRankNode(p));
+        card.append(nextTable(p));
         card.append(
           el(
             "p",
@@ -383,7 +474,7 @@
         card.classList.add("absent");
         card.append(
           el("div", { class: "rank muted" }, "—"),
-          el("p", { class: "gap" }, `Not on today's list (unregistered?). Last seen #${p.last_rank} on ${p.last_seen}.`),
+          el("p", { class: "gap" }, lastSeenText(p)),
           el("p", { class: "stats" }, p.stats ? `Last known power ${fmt(p.stats.power)} · Vita ${fmt(p.stats.vita)} · Mana ${fmt(p.stats.mana)} (${p.stats.date})` : "Stats were never visible.")
         );
       }
@@ -395,17 +486,18 @@
 
   function renderChart() {
     const dates = data.players.dates;
-    const showReal = document.getElementById("show-real").checked;
+    const inPath = view === "path";
+    const showReal = !inPath && document.getElementById("show-real").checked;
     const datasets = [];
     const values = [];
 
     selected.forEach((key, index) => {
       const p = player(key);
       if (!p) return;
-      const points = dates.map((date, i) => ({ x: date, y: rankOn(p, i) }));
+      const points = dates.map((date, i) => ({ x: date, y: viewRankOn(p, i) }));
       points.forEach((pt) => pt.y != null && values.push(pt.y));
       datasets.push({
-        label: p.name,
+        label: inPath && p.path ? `${p.name} (${pathName(p.path)})` : p.name,
         data: points,
         borderColor: color(index),
         backgroundColor: color(index),
@@ -462,7 +554,7 @@
             reverse: true, // rank 1 at the top
             min: 1,
             max: yMax,
-            title: { display: true, text: "Rank (1 = top)" },
+            title: { display: true, text: inPath ? "Rank within path (1 = top)" : "Rank (1 = top)" },
             afterBuildTicks: (scale) => {
               scale.ticks = ticks.map((value) => ({ value }));
             },
@@ -498,9 +590,10 @@
     for (const key of selected) {
       const p = player(key);
       if (!p) continue;
-      top.append(el("th", { class: "group", colspan: 3 }, p.name));
+      top.append(el("th", { class: "group", colspan: 4 }, p.name));
       second.append(
         el("th", { class: "group" }, "Rank"),
+        el("th", { title: p.path ? `Rank among the top 250 ${pathPlural(p.path)}` : "Path unknown (never in a path Top 250)" }, p.path ? pathName(p.path) : "Path"),
         el("th", { title: "Official rank + unregistered players with higher last-known power" }, "Real"),
         el("th", { title: "Power needed to pass the nearest better-ranked player with visible stats" }, "Power to next")
       );
@@ -521,6 +614,16 @@
           if (change != null) rankCell.append(deltaNode(change));
         } else {
           rankCell.append(el("span", { class: "muted" }, "—"));
+        }
+
+        const pathRank = pathRankOn(p, dayIndex);
+        const pathCell = el("td");
+        if (pathRank != null) {
+          pathCell.append(`#${pathRank}`);
+          const change = delta(p, dayIndex, pathRankOn);
+          if (change != null) pathCell.append(deltaNode(change));
+        } else {
+          pathCell.append(el("span", { class: "muted" }, "—"));
         }
 
         const real = realRankOn(p, dayIndex);
@@ -544,7 +647,7 @@
         } else {
           gapCell.append(el("span", { class: "muted" }, "—"));
         }
-        tr.append(rankCell, realCell, gapCell);
+        tr.append(rankCell, pathCell, realCell, gapCell);
       }
       return tr;
     });
@@ -590,10 +693,16 @@
     const updated = data.players.generated_at.slice(0, 16).replace("T", " ");
     const days = data.players.dates.length;
     document.getElementById("meta").textContent =
-      `${days} snapshot${days === 1 ? "" : "s"} · ${fmt(present)} on today's list · ${fmt(Object.keys(data.players.players).length)} players known · ${fmt(data.players.absent.length)} unregistered · updated ${updated} UTC.`;
+      `${days} snapshot${days === 1 ? "" : "s"} · ${fmt(present)} on today's lists · ${fmt(Object.keys(data.players.players).length)} players known · ${fmt(data.players.absent.length)} unregistered · updated ${updated} UTC.`;
 
     selected = readSelection();
+    view = readView();
     setupSearch();
+    document.querySelectorAll('input[name="view"]').forEach((input) => {
+      input.checked = input.value === view;
+      input.addEventListener("change", () => setView(input.value));
+    });
+    document.getElementById("show-real").disabled = view === "path";
     document.getElementById("show-real").addEventListener("change", renderChart);
     document.getElementById("reset").addEventListener("click", resetSelection);
     document.getElementById("show-all").addEventListener("click", () => {
@@ -602,7 +711,7 @@
     });
     window.addEventListener("hashchange", () => {
       selected = readSelection();
-      render();
+      setView(readView());
     });
     render();
   }

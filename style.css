@@ -95,6 +95,24 @@ code { font-size: 0.9em; }
 .suggestions .rank { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .suggestions .empty { padding: 6px 10px; color: var(--muted); }
 .toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.toggle:has(input:disabled) { opacity: 0.45; cursor: default; }
+.segmented {
+  display: inline-flex;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.segmented label {
+  padding: 6px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.segmented label + label { border-left: 1px solid var(--border); }
+.segmented input { position: absolute; opacity: 0; width: 0; height: 0; }
+.segmented label:has(input:checked) { background: var(--accent); color: #fff; }
 
 /* panels & cards */
 .panel {
@@ -139,6 +157,9 @@ code { font-size: 0.9em; }
 .card .title { font-weight: normal; color: var(--muted); }
 .card .rank { font-size: 2.2rem; font-weight: 700; line-height: 1.1; margin: 6px 0 2px; }
 .card .rank small { font-size: 0.95rem; font-weight: 600; margin-left: 6px; }
+.card .rank .rank-label { font-weight: 500; }
+.card .rank-sub { margin: 0 0 4px; color: var(--text); }
+.card .rank-sub .delta { font-size: 0.85rem; margin-left: 4px; }
 .card .real { margin: 0 0 6px; }
 .card .real strong { font-size: 1.1rem; }
 .card .real details { display: inline; }

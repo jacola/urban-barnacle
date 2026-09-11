@@ -46,6 +46,13 @@ HISTORY_PATH = DATA_DIR / "history.json"
 PLAYERS_PATH = DATA_DIR / "players.json"
 
 RANKING_URL = "http://users.nexustk.com/webreport/PowerAll.htm"
+# Per-path "Top 250" rankings, refreshed together with the overall list.
+PATH_URLS = {
+    "warrior": "http://users.nexustk.com/webreport/PowerWarrior.htm",
+    "rogue": "http://users.nexustk.com/webreport/PowerRogue.htm",
+    "mage": "http://users.nexustk.com/webreport/PowerMage.htm",
+    "poet": "http://users.nexustk.com/webreport/PowerPoet.htm",
+}
 # Character pages are static files. Fetching them directly avoids the two-hop
 # redirect (through a CGI script) behind http://users.nexustk.com/?name=...
 CHARACTER_URL = "http://users.nexustk.com/userfiles/{key}.html"
@@ -62,6 +69,7 @@ DEFAULTS = {
     "max_lookups_above": 10,
     "max_consecutive_errors": 20,
     "min_rows": 500,
+    "min_path_rows": 100,
     "real_rank_max_absent_days": None,
 }
 
@@ -253,6 +261,25 @@ def load_previous_checks():
     return {key: p["stats_checked"] for key, p in payload.get("players", {}).items() if p.get("stats_checked")}
 
 
+def fetch_path_lists(date, cfg):
+    """path -> parsed rows of the per-path Top 250 pages. A failing page is skipped, not fatal."""
+    paths = {}
+    for path, url in PATH_URLS.items():
+        time.sleep(cfg["request_delay_seconds"])
+        try:
+            raw = http_get(url)
+        except Exception as exc:
+            log(f"  {path}: failed to fetch ({exc}); skipping today")
+            continue
+        rows = parse_rankings(decode(raw))
+        if len(rows) < cfg["min_path_rows"]:
+            log(f"  {path}: only {len(rows)} rows (< {cfg['min_path_rows']}); skipping suspicious page")
+            continue
+        (RAW_DIR / f"{date}-{path}.htm").write_bytes(raw)
+        paths[path] = rows
+    return paths
+
+
 def cmd_fetch(args):
     cfg = load_config()
     now = dt.datetime.now(dt.timezone.utc)
@@ -268,6 +295,15 @@ def cmd_fetch(args):
 
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     (RAW_DIR / f"{date}.htm").write_bytes(raw)
+
+    log("Fetching path rankings")
+    paths = fetch_path_lists(date, cfg)
+    everyone = {row["key"]: row for row in rankings}
+    for rows in paths.values():
+        for row in rows:
+            everyone.setdefault(row["key"], row)
+    log(f"Path pages: {', '.join(f'{path} {len(rows)}' for path, rows in paths.items()) or 'none'}"
+        f" (+{len(everyone) - len(rankings)} characters not in the overall list)")
 
     positions = index_by_key(rankings)
     previous = load_previous_checks()
@@ -296,21 +332,31 @@ def cmd_fetch(args):
             log(f"  {row['name']} (#{row['rank']}): {result['status']}{detail}")
         return result
 
-    # 1. Tracked players and the players directly above them (walk up past hidden stats).
-    for name in cfg["tracked"]:
-        key = name.lower()
-        if key not in positions:
-            log(f"{name}: not in the top {len(rankings)} today")
-            continue
-        position = positions[key]
-        log(f"{name}: rank {rankings[position]['rank']}")
-        lookup(rankings[position], verbose=True)
-        for attempt, row in enumerate(rows_above(rankings, position)):
+    def walk_up(rows, position):
+        """Look up the players above rows[position] until one with visible stats is found."""
+        for attempt, row in enumerate(rows_above(rows, position)):
             if attempt >= cfg["max_lookups_above"]:
                 break
             result = lookup(row, verbose=True)
             if result is None or result["status"] == "ok":
                 break
+
+    # 1. Tracked players and the players directly above them, on the overall and their path list.
+    for name in cfg["tracked"]:
+        key = name.lower()
+        if key not in everyone:
+            log(f"{name}: not on any list today")
+            continue
+        if key in positions:
+            log(f"{name}: rank {rankings[positions[key]]['rank']}")
+            lookup(rankings[positions[key]], verbose=True)
+            walk_up(rankings, positions[key])
+        for path, rows in paths.items():
+            position = index_by_key(rows).get(key)
+            if position is not None:
+                log(f"{name}: {path} rank {rows[position]['rank']}")
+                lookup(rows[position], verbose=True)
+                walk_up(rows, position)
 
     # 2. Everyone else whose stats are due, never-checked first, then the stalest.
     def due(row):
@@ -322,10 +368,10 @@ def cmd_fetch(args):
         except ValueError:
             return True
 
-    candidates = [row for row in rankings if row["key"] not in stats and due(row)]
+    candidates = [row for row in everyone.values() if row["key"] not in stats and due(row)]
     candidates.sort(key=lambda row: (previous.get(row["key"]) or "", row["rank"]))
     planned = max(0, min(len(candidates), budget - len(stats)))
-    log(f"Refreshing stats for {planned} of {len(candidates)} due players ({len(rankings) - len(candidates) - len(stats)} fresh, skipped)")
+    log(f"Refreshing stats for {planned} of {len(candidates)} due players ({len(everyone) - len(candidates) - len(stats)} fresh, skipped)")
     for count, row in enumerate(candidates, 1):
         if lookup(row) is None:
             break
@@ -339,6 +385,7 @@ def cmd_fetch(args):
         "source": RANKING_URL,
         "count": len(rankings),
         "rankings": rankings,
+        "paths": paths,
         "stats": stats,
     }
     path = SNAPSHOT_DIR / f"{date}.json"
@@ -457,15 +504,41 @@ def new_player(row, date, n_days):
         "name": row["name"],
         "title": row["title"],
         "first_seen": date,
+        "path": None,  # warrior / rogue / mage / poet, from the per-path pages
         "stats": None,
         "stats_checked": None,
+        "last_seen": None,  # last day on the overall list, and the rank there
+        "last_rank": None,
+        "last_active": date,  # last day on any list (overall or path)
+        "last_path_rank": None,
         # Per-day series aligned with "dates". 0 = not on the list / unknown.
         "ranks": [0] * n_days,
+        "path_ranks": [0] * n_days,  # rank on the player's path Top 250
         "gaps": [0] * n_days,  # power needed to pass the next visible player
         "next": [None] * n_days,  # key of that player (converted to a 1-based index into "keys")
         "unreg": [0] * n_days,  # unregistered players definitely above
         "unreg_max": [0] * n_days,  # ... including uncertain ones
     }
+
+
+def note_stats(player, own, date):
+    if own and own["status"] != "error":
+        player["stats_checked"] = date
+        player["stats_status"] = own["status"]
+    if own and own["status"] == "ok":
+        player["stats"] = {"date": date, "vita": own["vita"], "mana": own["mana"], "power": own["power"]}
+
+
+def path_only_record(date, row, own, bounds):
+    """Today's state for a player who is on a path list but not on the overall list."""
+    record = {"date": date, "rank": None, "power": None, "vita": None, "mana": None, "next": None}
+    if own and own["status"] == "ok":
+        record.update(vita=own["vita"], mana=own["mana"], power=own["power"])
+    elif own:
+        record["stats_status"] = own["status"]
+    record["lo"], record["hi"] = bounds[row["key"]]
+    record.update(unregistered_above=None, real_rank=None, real_rank_max=None)
+    return record
 
 
 def cmd_build(args):
@@ -484,33 +557,48 @@ def cmd_build(args):
         date = snapshot["date"]
         rankings = snapshot["rankings"]
         stats = snapshot.get("stats", {})
+        paths = snapshot.get("paths", {})
         positions = index_by_key(rankings)
         bounds = compute_bounds(rankings, stats)
+        last_day = day_index == n_days - 1
 
         for row in rankings:
             player = players.get(row["key"])
             if player is None:
                 player = players[row["key"]] = new_player(row, date, n_days)
-            player.update(name=row["name"], title=row["title"], last_seen=date, last_rank=row["rank"])
+            player.update(name=row["name"], title=row["title"], last_seen=date, last_rank=row["rank"], last_active=date)
             player["ranks"][day_index] = row["rank"]
-            own = stats.get(row["key"])
-            if own and own["status"] != "error":
-                player["stats_checked"] = date
-                player["stats_status"] = own["status"]
-            if own and own["status"] == "ok":
-                player["stats"] = {"date": date, "vita": own["vita"], "mana": own["mana"], "power": own["power"]}
+            note_stats(player, stats.get(row["key"]), date)
             player["lo"], player["hi"] = bounds[row["key"]]
 
-        def within_window(player):
-            return window is None or (parse_date(date) - parse_date(player["last_seen"])).days <= window
+        present = set(positions)
+        for path, rows in paths.items():
+            path_bounds = compute_bounds(rows, stats)
+            for row in rows:
+                player = players.get(row["key"])
+                if player is None:
+                    player = players[row["key"]] = new_player(row, date, n_days)
+                player.update(path=path, last_active=date, last_path_rank=row["rank"])
+                player["path_ranks"][day_index] = row["rank"]
+                if row["key"] not in positions:  # only on the path list: bounds come from its neighbours there
+                    player.update(name=row["name"], title=row["title"])
+                    note_stats(player, stats.get(row["key"]), date)
+                    player["lo"], player["hi"] = path_bounds[row["key"]]
+                    if last_day:
+                        player["today"] = path_only_record(date, row, stats.get(row["key"]), path_bounds)
+                present.add(row["key"])
 
-        absent_keys = [key for key, player in players.items() if key not in positions and within_window(player)]
+        def within_window(player):
+            return window is None or (parse_date(date) - parse_date(player["last_active"])).days <= window
+
+        absent_keys = [key for key, player in players.items() if key not in present and within_window(player)]
         absent = AbsentIndex(players[key] for key in absent_keys)
-        last_day = day_index == n_days - 1
 
         for position, row in enumerate(rankings):
             record = daily_record(date, rankings, position, stats, bounds, absent)
             player = players[row["key"]]
+            record["path"] = player["path"]
+            record["path_rank"] = player["path_ranks"][day_index] or None
             if record["next"]:
                 player["next"][day_index] = record["next"]["key"]
                 if record["next"]["gap"] is not None:
@@ -526,8 +614,10 @@ def cmd_build(args):
                 history[key].append({"date": date, "rank": None, "power": None, "next": None})
         if last_day:
             for key, player in players.items():
-                if key not in positions:
+                if key not in present:
                     player["today"] = None
+                elif key not in positions:  # path-only today
+                    player["today"].update(path=player["path"], path_rank=player["path_ranks"][day_index])
 
     keys = sorted(players)
     key_index = {key: index + 1 for index, key in enumerate(keys)}  # 1-based; 0 = none

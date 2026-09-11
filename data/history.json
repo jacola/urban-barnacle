@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-11T00:04:52+00:00",
+ "generated_at": "2026-09-11T00:26:38+00:00",
  "source": "http://users.nexustk.com/webreport/PowerAll.htm",
  "power_formula": "vita + 2 * mana",
  "snapshots": 1,
@@ -30,7 +30,9 @@
      },
      "unregistered_above": 0,
      "real_rank": 86,
-     "real_rank_max": 86
+     "real_rank_max": 86,
+     "path": null,
+     "path_rank": null
     }
    ]
   },
@@ -56,7 +58,9 @@
      },
      "unregistered_above": 0,
      "real_rank": 114,
-     "real_rank_max": 114
+     "real_rank_max": 114,
+     "path": null,
+     "path_rank": null
     }
    ]
   }

@@ -22,6 +22,10 @@
         <input id="search" type="search" placeholder="Add a character&hellip; type a name" autocomplete="off" spellcheck="false" aria-label="Add a character">
         <ul id="suggestions" class="suggestions" hidden></ul>
       </div>
+      <fieldset class="segmented" aria-label="Rank perspective">
+        <label><input type="radio" name="view" value="overall" checked> Overall</label>
+        <label><input type="radio" name="view" value="path"> Within path</label>
+      </fieldset>
       <label class="toggle"><input type="checkbox" id="show-real"> Show real rank (dashed)</label>
       <button id="reset" type="button" class="link-button">Reset to defaults</button>
     </section>
@@ -49,7 +53,13 @@
 
   <footer class="muted">
     <p>
-      <strong>Real rank</strong> adds the players who are missing from today's list (unregistered) but whose
+      <strong>Within path</strong> uses the per-path Top 250 pages
+      (<a href="http://users.nexustk.com/webreport/PowerWarrior.htm" target="_blank" rel="noopener">Warriors</a>,
+      <a href="http://users.nexustk.com/webreport/PowerRogue.htm" target="_blank" rel="noopener">Rogues</a>,
+      <a href="http://users.nexustk.com/webreport/PowerMage.htm" target="_blank" rel="noopener">Mages</a>,
+      <a href="http://users.nexustk.com/webreport/PowerPoet.htm" target="_blank" rel="noopener">Poets</a>);
+      a player's path is only known once they have appeared on one of them.
+      <strong>Real rank</strong> adds the players who are missing from today's lists (unregistered) but whose
       last-known power is higher. Players with hidden stats are bounded by their nearest visible neighbours,
       which can leave an uncertain range.
       <strong>Power to next</strong> compares against the nearest better-ranked player whose character page shows stats.
