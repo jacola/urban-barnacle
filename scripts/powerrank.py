@@ -311,6 +311,14 @@ def cmd_fetch(args):
     stats = {}
     state = {"errors_in_row": 0, "aborted": False}
 
+    # A re-run on the same date must not discard the lookups already archived that day.
+    snapshot_path = SNAPSHOT_DIR / f"{date}.json"
+    carried = {}
+    if snapshot_path.exists():
+        with snapshot_path.open(encoding="utf-8") as fh:
+            carried = {key: value for key, value in json.load(fh).get("stats", {}).items() if value.get("status") != "error"}
+        log(f"Carrying over {len(carried)} stats from the earlier snapshot of {date}")
+
     def lookup(row, verbose=False):
         key = row["key"]
         if key in stats:
@@ -360,7 +368,7 @@ def cmd_fetch(args):
 
     # 2. Everyone else whose stats are due, never-checked first, then the stalest.
     def due(row):
-        checked = previous.get(row["key"])
+        checked = date if row["key"] in carried else previous.get(row["key"])
         if not checked:
             return True
         try:
@@ -378,6 +386,9 @@ def cmd_fetch(args):
         if count % 100 == 0:
             log(f"  ...{count} lookups done")
     log(f"Stats lookups: {dict(Counter(result['status'] for result in stats.values()))}")
+    merged = {**carried, **stats}
+    if carried:
+        log(f"Snapshot stats after merge: {len(merged)}")
 
     snapshot = {
         "date": date,
@@ -386,11 +397,10 @@ def cmd_fetch(args):
         "count": len(rankings),
         "rankings": rankings,
         "paths": paths,
-        "stats": stats,
+        "stats": merged,
     }
-    path = SNAPSHOT_DIR / f"{date}.json"
-    write_json(path, snapshot, indent=None if len(stats) > 50 else 1)
-    log(f"Wrote {rel(path)}")
+    write_json(snapshot_path, snapshot, indent=None if len(merged) > 50 else 1)
+    log(f"Wrote {rel(snapshot_path)}")
 
 
 # --------------------------------------------------------------------------- build
