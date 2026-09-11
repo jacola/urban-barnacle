@@ -1,17 +1,12 @@
 (function () {
   "use strict";
 
+  const { fmt, pathName, pathPlural, el, link, seriesDelta, deltaNode, loadPlayers } = window.PR;
   const COLORS = ["#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed", "#db2777", "#0891b2", "#65a30d"];
   const STORAGE_KEY = "powerrank.selected";
   const VIEW_KEY = "powerrank.view";
   const TABLE_ROWS = 30;
   const NEXT_ROWS = 5;
-  const PATH_NAMES = { warrior: "Warrior", rogue: "Rogue", mage: "Mage", poet: "Poet" };
-  const numberFormat = new Intl.NumberFormat("en-US");
-  const fmt = (n) => (n == null ? "—" : numberFormat.format(n));
-  const charUrl = (key) => `http://users.nexustk.com/?name=${encodeURIComponent(key)}`;
-  const pathName = (path) => PATH_NAMES[path] || "Path";
-  const pathPlural = (path) => (PATH_NAMES[path] ? `${PATH_NAMES[path]}s` : "path");
 
   // data.players: players.json - per-player daily series (rank, path rank, gap to next,
   // real-rank extras) plus current state for every player who has ever appeared on a list.
@@ -22,21 +17,6 @@
   let showAllRows = false;
 
   // ------------------------------------------------------------------ helpers
-
-  function el(tag, attrs = {}, ...children) {
-    const node = document.createElement(tag);
-    for (const [name, value] of Object.entries(attrs)) {
-      if (name === "class") node.className = value;
-      else if (name.startsWith("on")) node.addEventListener(name.slice(2), value);
-      else node.setAttribute(name, value);
-    }
-    node.append(...children);
-    return node;
-  }
-
-  function link(key, text) {
-    return el("a", { href: charUrl(key), target: "_blank", rel: "noopener" }, text);
-  }
 
   function player(key) {
     return data.players.players[key];
@@ -80,20 +60,7 @@
 
   // Change versus the previous day the player had a value in the series (positive = climbed).
   function delta(p, dayIndex, series = rankOn) {
-    const current = series(p, dayIndex);
-    if (current == null) return null;
-    for (let i = dayIndex - 1; i >= 0; i--) {
-      const previous = series(p, i);
-      if (previous != null) return previous - current;
-    }
-    return null;
-  }
-
-  function deltaNode(value, tag = "span") {
-    if (value == null) return el(tag, { class: "delta muted" }, "");
-    if (value === 0) return el(tag, { class: "delta muted" }, "=");
-    const up = value > 0;
-    return el(tag, { class: `delta ${up ? "up" : "down"}` }, `${up ? "▲" : "▼"}${Math.abs(value)}`);
+    return seriesDelta(series === pathRankOn ? p.path_ranks : p.ranks, dayIndex);
   }
 
   // Absent (unregistered) players whose last-known power is above this player's bounds today.
@@ -674,20 +641,13 @@
     renderTable();
   }
 
-  async function loadJson(path) {
-    const response = await fetch(path, { cache: "no-store" });
-    if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`);
-    return response.json();
-  }
-
   async function main() {
     try {
-      data.players = await loadJson("data/players.json");
+      data.players = await loadPlayers();
     } catch (error) {
       document.getElementById("cards").replaceChildren(el("p", { class: "muted" }, `No data yet (${error.message}). The daily workflow populates the data files.`));
       return;
     }
-    for (const [key, p] of Object.entries(data.players.players)) p.key = key;
 
     const present = Object.values(data.players.players).filter((p) => p.today).length;
     const updated = data.players.generated_at.slice(0, 16).replace("T", " ");

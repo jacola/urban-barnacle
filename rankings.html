@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rankings · NexusTK Power Rank Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="wide">
+  <header>
+    <nav class="nav"><a href="./">Tracker</a><a href="rankings.html" aria-current="page">Rankings</a></nav>
+    <h1>Extended rankings</h1>
+    <p class="sub">
+      Today's ranking lists with the stats behind them: vita, mana, power and how far each player is from the
+      nearest better-ranked player with visible stats.
+      <span id="meta" class="muted"></span>
+    </p>
+  </header>
+
+  <main>
+    <section class="toolbar">
+      <fieldset class="segmented" aria-label="Ranking list">
+        <label><input type="radio" name="list" value="overall" checked> Overall</label>
+        <label><input type="radio" name="list" value="warrior"> Warriors</label>
+        <label><input type="radio" name="list" value="rogue"> Rogues</label>
+        <label><input type="radio" name="list" value="mage"> Mages</label>
+        <label><input type="radio" name="list" value="poet"> Poets</label>
+      </fieldset>
+      <div class="search">
+        <input id="filter" type="search" placeholder="Filter by name" autocomplete="off" spellcheck="false" aria-label="Filter by name">
+      </div>
+      <label class="toggle"><input type="checkbox" id="visible-only"> Only visible stats</label>
+    </section>
+
+    <section class="panel board-panel">
+      <div class="board-wrap">
+        <table id="board" class="board">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p id="empty" class="muted" hidden>No players match.</p>
+    </section>
+  </main>
+
+  <footer class="muted">
+    <p>
+      <strong>To next</strong> is the power needed to pass the nearest better-ranked player on this list whose
+      character page shows stats (players with hidden stats or no page are skipped). Click a numeric column header
+      to sort by it; the highlighted rows are the characters from <code>config.json</code>.
+      Data: <a href="data/players.json">players.json</a>.
+    </p>
+  </footer>
+
+  <script src="common.js"></script>
+  <script src="rankings.js"></script>
+</body>
+</html>

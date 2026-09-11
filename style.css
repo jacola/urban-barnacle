@@ -23,8 +23,13 @@ header, main, footer {
   margin: 0 auto;
   padding: 0 16px;
 }
+.wide header, .wide main, .wide footer { max-width: 1240px; }
 
 header { padding-top: 24px; }
+.nav { display: flex; gap: 4px; margin-bottom: 14px; font-size: 0.9rem; }
+.nav a { padding: 4px 12px; border-radius: 999px; color: var(--muted); }
+.nav a:hover { text-decoration: none; background: #e9ecf1; }
+.nav a[aria-current="page"] { background: var(--accent); color: #fff; }
 h1 { margin: 0 0 4px; font-size: 1.6rem; }
 h2 { margin: 0 0 12px; font-size: 1.1rem; }
 h3 { margin: 0; font-size: 1.05rem; }
@@ -219,6 +224,41 @@ code { font-size: 0.9em; }
 
 footer { padding: 8px 16px 32px; font-size: 0.85rem; }
 footer p { margin: 0 0 8px; }
+
+/* rankings page */
+.board-panel { padding: 0 0 8px; }
+.board-wrap { overflow: visible; } /* lets the header stick to the viewport */
+@media (max-width: 1000px) {
+  .board-wrap { overflow-x: auto; }
+}
+.board { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 0.92rem; }
+.board th, .board td { padding: 5px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; text-align: left; }
+.board th:first-child, .board td:first-child { padding-left: 14px; }
+.board th:last-child, .board td:last-child { padding-right: 14px; }
+.board .num { text-align: right; }
+.board thead th { position: sticky; top: 0; background: #f0f2f5; z-index: 1; }
+.board thead tr th:first-child { border-top-left-radius: 10px; }
+.board thead tr th:last-child { border-top-right-radius: 10px; }
+.board thead th.sortable button {
+  all: unset;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+.board thead th.sortable button:hover { color: var(--accent); }
+.board thead th.active button { color: var(--accent); }
+.board .arrow { font-size: 0.7em; margin-left: 4px; }
+.board tbody tr:hover td { background: #f8fafc; }
+.board tbody tr.tracked td { background: #eef2ff; }
+.board td.player { max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+.board td.strong { font-weight: 600; }
+.board td.status { text-align: center; }
+.board td .target { color: var(--muted); font-size: 0.85rem; margin-left: 6px; }
+.board td .delta { font-size: 0.8rem; margin-left: 4px; }
+.board td .uncertain { color: var(--muted); font-size: 0.85rem; }
+.board .chart-link { font-size: 0.75rem; color: var(--muted); margin-left: 4px; }
+.board tr:hover .chart-link { color: var(--accent); }
+#empty { padding: 16px; }
 
 @media (max-width: 600px) {
   .chart-wrap { height: 320px; }

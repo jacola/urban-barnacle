@@ -12,6 +12,13 @@ on their character pages.
 
 ## What the site shows
 
+The site has two pages: the **Tracker** (`index.html`) for following selected
+characters over time, and **Rankings** (`rankings.html`), an extended version
+of the ranking lists showing every player's vita, mana, power, gap to the
+nearest better-ranked player with visible stats, and real rank, for the
+overall Top 1000 and each path Top 250. Numeric columns are sortable and rows
+can be filtered by name.
+
 * **Search box** – type a name to add any character who has ever appeared on
   the list; press **×** on a card to remove it. The selection is kept in the
   URL (`#p=inkey,aero`) and in the browser, so links are shareable.
@@ -62,7 +69,9 @@ power.
 | `data/snapshots/YYYY-MM-DD.json` | Parsed rankings (overall and per path) plus every character stat looked up that day. Source of truth. |
 | `data/players.json` | Per-player daily series (rank, power to next, real-rank extras), current state and last-known power for every player ever seen. What the site reads. Derived. |
 | `data/history.json` | Human-readable daily record (stats, next player, real rank) for the `config.json` characters. Derived. |
-| `index.html`, `app.js`, `style.css` | The static site (Chart.js via CDN). |
+| `index.html`, `app.js` | The tracker page (Chart.js via CDN). |
+| `rankings.html`, `rankings.js` | The extended rankings page. |
+| `common.js`, `style.css` | Shared helpers and styles. |
 | `.github/workflows/fetch.yml` | Daily cron: fetch + build, then commit the result. |
 
 ## Setup
