@@ -4,6 +4,7 @@
   const COLORS = ["#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed", "#db2777", "#0891b2", "#65a30d"];
   const STORAGE_KEY = "powerrank.selected";
   const TABLE_ROWS = 30;
+  const NEXT_ROWS = 5;
   const numberFormat = new Intl.NumberFormat("en-US");
   const fmt = (n) => (n == null ? "—" : numberFormat.format(n));
   const charUrl = (key) => `http://users.nexustk.com/?name=${encodeURIComponent(key)}`;
@@ -280,22 +281,60 @@
     return wrap;
   }
 
-  function gapNode(today) {
-    const p = el("p", { class: "gap" });
-    const next = today.next;
-    if (today.rank === 1) {
-      p.append("Top of the list");
-    } else if (!next) {
-      p.append(el("span", { class: "muted" }, "Power to next rank unknown (no visible stats above)"));
-    } else if (next.gap == null) {
-      p.append(el("span", { class: "muted" }, `Next: ${next.name} (#${next.rank}) at ${fmt(next.power)} power — own stats hidden`));
-    } else if (next.gap <= 0) {
-      p.append(el("strong", {}, fmt(-next.gap)), " power ahead of ", link(next.key, next.name), ` (#${next.rank})`, el("span", { class: "muted" }, " · ranking not refreshed yet"));
-    } else {
-      p.append(el("strong", {}, fmt(next.gap)), " power to pass ", link(next.key, next.name), ` (#${next.rank})`);
-      if (next.skipped) p.append(el("span", { class: "muted" }, ` · ${next.skipped} hidden in between`));
+  // Better-ranked players with visible stats today, nearest first (ties with own rank excluded).
+  function visibleAbove(p, limit) {
+    const own = p.today;
+    const rows = [];
+    for (const key of data.players.keys) {
+      const q = player(key);
+      const t = q.today;
+      if (!t || t.rank >= own.rank || t.power == null) continue;
+      rows.push({ key, name: q.name, rank: t.rank, power: t.power });
     }
-    return p;
+    rows.sort((a, b) => b.rank - a.rank);
+    return rows.slice(0, limit);
+  }
+
+  function nextTable(p) {
+    const today = p.today;
+    const wrap = el("div", { class: "next" });
+    if (today.rank === 1) {
+      wrap.append(el("p", { class: "gap" }, "Top of the list"));
+      return wrap;
+    }
+    const rows = visibleAbove(p, NEXT_ROWS);
+    if (!rows.length) {
+      wrap.append(el("p", { class: "gap muted" }, "No visible stats above"));
+      return wrap;
+    }
+    const known = today.power != null;
+    const hiddenBetween = today.rank - rows[0].rank - 1;
+    const table = el(
+      "table",
+      { class: "next-table" },
+      el(
+        "thead",
+        {},
+        el("tr", {}, el("th", { class: "num" }, "Rank"), el("th", {}, "To pass"), el("th", { class: "num" }, known ? "Power needed" : "Their power"))
+      )
+    );
+    const body = el("tbody");
+    rows.forEach((r, index) => {
+      const cell = el("td", { class: "num" });
+      if (!known) {
+        cell.append(fmt(r.power));
+      } else {
+        const gap = r.power - today.power;
+        const text = index === 0 ? el("strong", {}, fmt(gap)) : fmt(gap);
+        cell.append(gap <= 0 ? el("span", { class: "muted", title: "Ranking not refreshed yet" }, text) : text);
+      }
+      body.append(el("tr", {}, el("td", { class: "num muted" }, `#${r.rank}`), el("td", {}, link(r.key, r.name)), cell));
+    });
+    table.append(body);
+    wrap.append(table);
+    if (!known) wrap.append(el("p", { class: "stats" }, "Own stats are hidden, so the gap is unknown."));
+    else if (hiddenBetween > 0) wrap.append(el("p", { class: "stats" }, `${hiddenBetween} player${hiddenBetween === 1 ? "" : "s"} with hidden stats between #${today.rank} and #${rows[0].rank}.`));
+    return wrap;
   }
 
   function renderCards() {
@@ -327,7 +366,7 @@
         const rank = el("div", { class: "rank" }, `#${today.rank}`);
         const change = delta(p, lastDay);
         if (change) rank.append(deltaNode(change, "small"));
-        card.append(rank, realRankNode(p), gapNode(today));
+        card.append(rank, realRankNode(p), nextTable(p));
         card.append(
           el(
             "p",
