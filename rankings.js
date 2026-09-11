@@ -3,10 +3,14 @@
 
   const { fmt, pathName, pathPlural, el, link, seriesDelta, deltaNode, loadPlayers } = window.PR;
   const LIST_KEY = "powerrank.rankings.list";
+  const METRIC_KEY = "powerrank.rankings.by";
   const LISTS = ["overall", "warrior", "rogue", "mage", "poet"];
+  const METRICS = ["power", "vita", "mana"];
+  const METRIC_LABELS = { power: "Power", vita: "Vita", mana: "Mana" };
 
   let data = null;
   let list = "overall";
+  let metric = "power"; // "power" = the official ranking; "vita" / "mana" re-rank by that stat
   let sortKey = "rank";
   let sortDir = 1;
   let filter = "";
@@ -14,38 +18,43 @@
 
   // ------------------------------------------------------------------ state
 
+  function readStored(key, allowed) {
+    try {
+      const stored = localStorage.getItem(key);
+      if (allowed.includes(stored)) return stored;
+    } catch (error) {
+      /* ignore */
+    }
+    return null;
+  }
+
   function readState() {
     const params = new URLSearchParams(location.hash.slice(1));
     const fromHash = params.get("list");
-    if (LISTS.includes(fromHash)) list = fromHash;
-    else {
-      try {
-        const stored = localStorage.getItem(LIST_KEY);
-        if (LISTS.includes(stored)) list = stored;
-      } catch (error) {
-        /* ignore */
-      }
-    }
+    list = LISTS.includes(fromHash) ? fromHash : readStored(LIST_KEY, LISTS) || "overall";
+    const by = params.get("by");
+    metric = METRICS.includes(by) ? by : readStored(METRIC_KEY, METRICS) || "power";
     filter = params.get("q") || "";
   }
 
   function persistState() {
     try {
       localStorage.setItem(LIST_KEY, list);
+      localStorage.setItem(METRIC_KEY, metric);
     } catch (error) {
       /* ignore */
     }
     const params = [];
     if (list !== "overall") params.push(`list=${list}`);
+    if (metric !== "power") params.push(`by=${metric}`);
     if (filter) params.push(`q=${encodeURIComponent(filter)}`);
     window.history.replaceState(null, "", location.pathname + location.search + (params.length ? `#${params.join("&")}` : ""));
   }
 
   // ------------------------------------------------------------------ rows
 
-  // Today's rows for the selected list, in rank order, with the gap to the nearest
-  // better-ranked player with visible stats (ties share a rank and are skipped).
-  function buildRows() {
+  // Today's players on the selected list.
+  function baseRows() {
     const lastDay = data.dates.length - 1;
     const inPath = list !== "overall";
     const rows = [];
@@ -56,6 +65,7 @@
       rows.push({
         key: p.key,
         p,
+        official: inPath ? t.path_rank : t.rank,
         rank: inPath ? t.path_rank : t.rank,
         delta: seriesDelta(inPath ? p.path_ranks : p.ranks, lastDay),
         power: t.power,
@@ -67,8 +77,13 @@
         between: 0,
       });
     }
-    rows.sort((a, b) => a.rank - b.rank || a.p.name.localeCompare(b.p.name));
+    return rows;
+  }
 
+  // Official ranking order, with the gap to the nearest better-ranked player with
+  // visible stats (ties share a rank and are skipped).
+  function officialRows(rows) {
+    rows.sort((a, b) => a.rank - b.rank || a.p.name.localeCompare(b.p.name));
     let lastVisible = null; // nearest visible player with a strictly better rank
     let groupVisible = null; // visible player within the current tie group
     let groupRank = null;
@@ -90,7 +105,37 @@
       if (row.power != null) groupVisible = groupVisible || row;
       else hiddenSince++;
     }
-    return rows;
+    return { rows, unranked: 0 };
+  }
+
+  // Re-ranked by a single stat (competition ranking for ties); players without visible
+  // stats cannot be placed and are left out.
+  function statRows(rows) {
+    const ranked = rows.filter((row) => row[metric] != null);
+    ranked.sort((a, b) => b[metric] - a[metric] || a.official - b.official);
+    let groupValue = null;
+    let groupRank = 0;
+    let groupFirst = null;
+    let lastHigher = null; // nearest player with a strictly higher stat
+    ranked.forEach((row, index) => {
+      if (row[metric] !== groupValue) {
+        if (groupFirst) lastHigher = groupFirst;
+        groupValue = row[metric];
+        groupRank = index + 1;
+        groupFirst = row;
+      }
+      row.rank = groupRank;
+      row.delta = null; // no history for stat-based ranks
+      row.next = lastHigher;
+      row.gap = lastHigher ? lastHigher[metric] - row[metric] : null;
+      row.between = 0;
+    });
+    return { rows: ranked, unranked: rows.length - ranked.length };
+  }
+
+  function buildRows() {
+    const rows = baseRows();
+    return metric === "power" ? officialRows(rows) : statRows(rows);
   }
 
   function sortRows(rows) {
@@ -111,7 +156,8 @@
   function header(label, key, attrs = {}) {
     if (!key) return el("th", attrs, label);
     const active = sortKey === key;
-    const th = el("th", { ...attrs, class: `${attrs.class || ""} sortable${active ? " active" : ""}`.trim(), title: `Sort by ${label.toLowerCase()}` });
+    const title = attrs.title ? `${attrs.title} · click to sort` : `Sort by ${label.toLowerCase()}`;
+    const th = el("th", { ...attrs, class: `${attrs.class || ""} sortable${active ? " active" : ""}`.trim(), title });
     th.append(el("button", { type: "button", onclick: () => setSort(key) }, label, active ? el("span", { class: "arrow" }, sortDir > 0 ? "▲" : "▼") : ""));
     return th;
   }
@@ -129,29 +175,33 @@
 
   function render() {
     const inPath = list !== "overall";
+    const byStat = metric !== "power";
     const table = document.getElementById("board");
     const tracked = new Set(data.tracked);
+    const statClass = (name) => `num${metric === name ? " strong" : ""}`;
 
     table.tHead.replaceChildren(
       el(
         "tr",
         {},
-        header("#", "rank", { class: "num" }),
+        header("#", "rank", { class: "num", title: byStat ? `Rank by ${metric}` : "Official rank" }),
         header("Player"),
         header(inPath ? "Overall" : "Path", null, { class: inPath ? "num" : "" }),
-        header("Vita", "vita", { class: "num" }),
-        header("Mana", "mana", { class: "num" }),
-        header("Power", "power", { class: "num" }),
-        header("To next", "gap", { class: "num" }),
-        ...(inPath ? [] : [el("th", { class: "num", title: "Official rank + unregistered players with higher last-known power" }, "Real")])
+        ...(byStat ? [el("th", { class: "num", title: inPath ? `Official rank among ${pathPlural(list)}` : "Official rank" }, inPath ? `${pathName(list)} #` : "Power #")] : []),
+        header("Vita", "vita", { class: statClass("vita") }),
+        header("Mana", "mana", { class: statClass("mana") }),
+        header("Power", "power", { class: statClass("power") }),
+        header(byStat ? `To next (${metric})` : "To next", "gap", { class: "num" }),
+        ...(inPath || byStat ? [] : [el("th", { class: "num", title: "Official rank + unregistered players with higher last-known power" }, "Real")])
       )
     );
 
     const q = filter.trim().toLowerCase();
-    let rows = buildRows();
+    const built = buildRows();
+    let rows = built.rows;
     const total = rows.length;
     if (q) rows = rows.filter((row) => row.p.name.toLowerCase().includes(q));
-    if (visibleOnly) rows = rows.filter((row) => row.power != null);
+    if (visibleOnly && !byStat) rows = rows.filter((row) => row.power != null);
     rows = sortRows(rows);
 
     const body = rows.map((row) => {
@@ -172,9 +222,10 @@
       } else {
         tr.append(el("td", {}, p.path ? `${pathName(p.path)}${t.path_rank != null ? ` #${t.path_rank}` : ""}` : el("span", { class: "muted" }, "—")));
       }
+      if (byStat) tr.append(el("td", { class: "num muted" }, `#${row.official}`));
 
       if (row.power != null) {
-        tr.append(el("td", { class: "num" }, fmt(row.vita)), el("td", { class: "num" }, fmt(row.mana)), el("td", { class: "num strong" }, fmt(row.power)));
+        tr.append(el("td", { class: statClass("vita") }, fmt(row.vita)), el("td", { class: statClass("mana") }, fmt(row.mana)), el("td", { class: statClass("power") }, fmt(row.power)));
       } else {
         tr.append(el("td", { class: "muted status", colspan: 3 }, row.status === "no_page" ? "no character page" : row.status === "error" ? "lookup failed" : "stats hidden"));
       }
@@ -193,7 +244,7 @@
       }
       tr.append(gapCell);
 
-      if (!inPath) {
+      if (!inPath && !byStat) {
         const realCell = el("td", { class: "num" });
         if (t.real_rank != null) {
           realCell.append(`#${t.real_rank}`);
@@ -207,10 +258,14 @@
     });
     table.tBodies[0].replaceChildren(...body);
     document.getElementById("empty").hidden = rows.length > 0;
+    document.getElementById("visible-only").disabled = byStat;
 
-    const visible = buildRows().filter((row) => row.power != null).length;
-    const listName = inPath ? `top ${total} ${pathPlural(list)}` : `top ${total} overall`;
-    document.getElementById("meta").textContent = `As of ${data.dates[data.dates.length - 1]} · ${listName} · ${fmt(visible)} with visible stats${rows.length !== total ? ` · showing ${fmt(rows.length)}` : ""}.`;
+    const listName = inPath ? `top ${total + built.unranked} ${pathPlural(list)}` : `top ${total + built.unranked} overall`;
+    const parts = [`As of ${data.dates[data.dates.length - 1]}`, listName];
+    if (byStat) parts.push(`ranked by ${metric}`, `${fmt(built.unranked)} with hidden stats not ranked`);
+    else parts.push(`${fmt(built.rows.filter((row) => row.power != null).length)} with visible stats`);
+    if (rows.length !== total) parts.push(`showing ${fmt(rows.length)}`);
+    document.getElementById("meta").textContent = `${parts.join(" · ")}.`;
   }
 
   // ------------------------------------------------------------------ main
@@ -223,16 +278,28 @@
       return;
     }
     readState();
+    const syncControls = () => {
+      document.querySelectorAll('input[name="list"]').forEach((input) => (input.checked = input.value === list));
+      document.querySelectorAll('input[name="metric"]').forEach((input) => (input.checked = input.value === metric));
+      document.getElementById("filter").value = filter;
+    };
     document.querySelectorAll('input[name="list"]').forEach((input) => {
-      input.checked = input.value === list;
       input.addEventListener("change", () => {
         list = input.value;
         persistState();
         render();
       });
     });
+    document.querySelectorAll('input[name="metric"]').forEach((input) => {
+      input.addEventListener("change", () => {
+        metric = input.value;
+        sortKey = "rank";
+        sortDir = 1;
+        persistState();
+        render();
+      });
+    });
     const filterInput = document.getElementById("filter");
-    filterInput.value = filter;
     filterInput.addEventListener("input", () => {
       filter = filterInput.value;
       persistState();
@@ -244,10 +311,10 @@
     });
     window.addEventListener("hashchange", () => {
       readState();
-      document.querySelectorAll('input[name="list"]').forEach((input) => (input.checked = input.value === list));
-      filterInput.value = filter;
+      syncControls();
       render();
     });
+    syncControls();
     render();
   }
 

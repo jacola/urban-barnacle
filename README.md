@@ -16,8 +16,10 @@ The site has two pages: the **Tracker** (`index.html`) for following selected
 characters over time, and **Rankings** (`rankings.html`), an extended version
 of the ranking lists showing every player's vita, mana, power, gap to the
 nearest better-ranked player with visible stats, and real rank, for the
-overall Top 1000 and each path Top 250. Numeric columns are sortable and rows
-can be filtered by name.
+overall Top 1000 and each path Top 250. Any list can also be re-ranked **by
+vita** or **by mana** alone (handy for mages and poets), with the gap to the
+next player measured in that stat. Numeric columns are sortable and rows can
+be filtered by name.
 
 * **Search box** – type a name to add any character who has ever appeared on
   the list; press **×** on a card to remove it. The selection is kept in the

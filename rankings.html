@@ -26,6 +26,11 @@
         <label><input type="radio" name="list" value="mage"> Mages</label>
         <label><input type="radio" name="list" value="poet"> Poets</label>
       </fieldset>
+      <fieldset class="segmented" aria-label="Rank by">
+        <label><input type="radio" name="metric" value="power" checked> By power</label>
+        <label><input type="radio" name="metric" value="vita"> By vita</label>
+        <label><input type="radio" name="metric" value="mana"> By mana</label>
+      </fieldset>
       <div class="search">
         <input id="filter" type="search" placeholder="Filter by name" autocomplete="off" spellcheck="false" aria-label="Filter by name">
       </div>
@@ -46,7 +51,9 @@
   <footer class="muted">
     <p>
       <strong>To next</strong> is the power needed to pass the nearest better-ranked player on this list whose
-      character page shows stats (players with hidden stats or no page are skipped). Click a numeric column header
+      character page shows stats (players with hidden stats or no page are skipped).
+      <strong>By vita / by mana</strong> re-rank the list by that stat alone (ties share a rank); players whose
+      stats are hidden cannot be placed and are left out. Click a numeric column header
       to sort by it; the highlighted rows are the characters from <code>config.json</code>.
       Data: <a href="data/players.json">players.json</a>.
     </p>
