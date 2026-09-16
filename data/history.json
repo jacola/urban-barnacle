@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-09-15T07:07:23+00:00",
+ "generated_at": "2026-09-16T07:08:11+00:00",
  "source": "http://users.nexustk.com/webreport/PowerAll.htm",
  "power_formula": "vita + 2 * mana",
- "snapshots": 6,
+ "snapshots": 7,
  "tracked": [
   "inkey",
   "aero"
@@ -143,6 +143,28 @@
      "real_rank_max": 87,
      "path": "poet",
      "path_rank": 26
+    },
+    {
+     "date": "2026-09-16",
+     "rank": 84,
+     "power": 7375980,
+     "vita": 2600440,
+     "mana": 2387770,
+     "lo": 7375980,
+     "hi": 7375980,
+     "next": {
+      "rank": 78,
+      "key": "aesein",
+      "name": "Aesein",
+      "power": 7517436,
+      "skipped": 5,
+      "gap": 141456
+     },
+     "unregistered_above": 2,
+     "real_rank": 86,
+     "real_rank_max": 86,
+     "path": "poet",
+     "path_rank": 26
     }
    ]
   },
@@ -275,6 +297,28 @@
       "power": 6427550,
       "skipped": 1,
       "gap": 58123
+     },
+     "unregistered_above": 5,
+     "real_rank": 114,
+     "real_rank_max": 114,
+     "path": "rogue",
+     "path_rank": 18
+    },
+    {
+     "date": "2026-09-16",
+     "rank": 109,
+     "power": 6384667,
+     "vita": 3270371,
+     "mana": 1557148,
+     "lo": 6384667,
+     "hi": 6384667,
+     "next": {
+      "rank": 107,
+      "key": "andy",
+      "name": "Andy",
+      "power": 6427550,
+      "skipped": 1,
+      "gap": 42883
      },
      "unregistered_above": 5,
      "real_rank": 114,
