@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-09-24T07:05:34+00:00",
+ "generated_at": "2026-09-25T07:10:28+00:00",
  "source": "http://users.nexustk.com/webreport/PowerAll.htm",
  "power_formula": "vita + 2 * mana",
- "snapshots": 15,
+ "snapshots": 16,
  "tracked": [
   "inkey",
   "aero"
@@ -341,6 +341,28 @@
      "real_rank_max": 85,
      "path": "poet",
      "path_rank": 26
+    },
+    {
+     "date": "2026-09-25",
+     "rank": 79,
+     "power": 7448190,
+     "vita": 2600740,
+     "mana": 2423725,
+     "lo": 7448190,
+     "hi": 7448190,
+     "next": {
+      "rank": 77,
+      "key": "aesein",
+      "name": "Aesein",
+      "power": 7518866,
+      "skipped": 1,
+      "gap": 70676
+     },
+     "unregistered_above": 6,
+     "real_rank": 85,
+     "real_rank_max": 85,
+     "path": "poet",
+     "path_rank": 26
     }
    ]
   },
@@ -671,6 +693,28 @@
       "power": 6498562,
       "skipped": 0,
       "gap": 27665
+     },
+     "unregistered_above": 9,
+     "real_rank": 116,
+     "real_rank_max": 116,
+     "path": "rogue",
+     "path_rank": 18
+    },
+    {
+     "date": "2026-09-25",
+     "rank": 107,
+     "power": 6491677,
+     "vita": 3270731,
+     "mana": 1610473,
+     "lo": 6491677,
+     "hi": 6491677,
+     "next": {
+      "rank": 106,
+      "key": "poeticmanic",
+      "name": "poeticmanic",
+      "power": 6498562,
+      "skipped": 0,
+      "gap": 6885
      },
      "unregistered_above": 9,
      "real_rank": 116,
