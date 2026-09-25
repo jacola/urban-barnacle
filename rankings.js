@@ -15,6 +15,7 @@
   let sortDir = 1;
   let filter = "";
   let visibleOnly = false;
+  let chart = null;
 
   // ------------------------------------------------------------------ state
 
@@ -173,6 +174,73 @@
     render();
   }
 
+  function renderChart(rows, maxRank) {
+    const label = METRIC_LABELS[metric];
+    const title = `${label} by rank`;
+    const canvas = document.getElementById("rank-chart");
+    const status = document.getElementById("chart-status");
+    const points = rows
+      .filter((row) => row[metric] != null)
+      .sort((a, b) => a.rank - b.rank)
+      .map((row) => ({ x: row.rank, y: row[metric], name: row.p.name }));
+
+    document.getElementById("rank-chart-title").textContent = title;
+    canvas.setAttribute("aria-label", `${title} for players with visible stats`);
+    if (chart) {
+      chart.destroy();
+      chart = null;
+    }
+    if (!points.length || typeof Chart === "undefined") {
+      canvas.hidden = true;
+      status.textContent = points.length ? "Chart library failed to load." : "No players with visible stats match this selection.";
+      status.hidden = false;
+      return;
+    }
+    canvas.hidden = false;
+    status.hidden = true;
+    chart = new Chart(canvas, {
+      type: "line",
+      data: {
+        datasets: [{
+          data: points,
+          borderColor: "#2563eb",
+          backgroundColor: "#2563eb",
+          borderWidth: 2,
+          pointRadius: points.length > 200 ? 1 : 2,
+          pointHoverRadius: 5,
+          tension: 0,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (items) => items.length ? `#${items[0].raw.x} ${items[0].raw.name}` : "",
+              label: (item) => `${label}: ${fmt(item.raw.y)}`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            type: "linear",
+            min: 1,
+            max: Math.max(2, maxRank),
+            title: { display: true, text: metric === "power" ? "Official rank" : `Rank by ${label.toLowerCase()}` },
+            ticks: { precision: 0 },
+          },
+          y: {
+            title: { display: true, text: label },
+            ticks: { callback: (value) => fmt(value) },
+          },
+        },
+      },
+    });
+  }
+
   function render() {
     const inPath = list !== "overall";
     const byStat = metric !== "power";
@@ -202,6 +270,7 @@
     const total = rows.length;
     if (q) rows = rows.filter((row) => row.p.name.toLowerCase().includes(q));
     if (visibleOnly && !byStat) rows = rows.filter((row) => row.power != null);
+    renderChart(rows, total ? Math.max(...built.rows.map((row) => row.rank)) : 1);
     rows = sortRows(rows);
 
     const body = rows.map((row) => {

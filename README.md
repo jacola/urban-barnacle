@@ -19,7 +19,9 @@ nearest better-ranked player with visible stats, and real rank, for the
 overall Top 1000 and each path Top 250. Any list can also be re-ranked **by
 vita** or **by mana** alone (handy for mages and poets), with the gap to the
 next player measured in that stat. Numeric columns are sortable and rows can
-be filtered by name.
+be filtered by name. A chart above the rankings table plots the selected
+metric against rank for players with visible stats; list and name filters
+apply to both the chart and table.
 
 * **Search box** – type a name to add any character who has ever appeared on
   the list; press **×** on a card to remove it. The selection is kept in the
@@ -32,8 +34,10 @@ be filtered by name.
   real rank (with the list of unregistered players above), the nearest five
   better-ranked players with visible stats and the power needed to pass each,
   and the character's stats.
-* **Chart** – rank over time (1 at the top); optional dashed real-rank lines
-  in the overall view.
+* **Chart** – rank over time (1 at the top) for the last 7, 30 or 365 days
+  of snapshots (1w / 1m / 1y); the selected period is remembered. In the
+  overall view, *Show real rank* replaces the official-rank lines with
+  real-rank lines.
 * **History table** – overall rank, path rank, real rank and power to next
   per day for every selected character.
 

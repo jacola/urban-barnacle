@@ -27,7 +27,7 @@
         <label><input type="radio" name="view" value="overall" checked> Overall</label>
         <label><input type="radio" name="view" value="path"> Within path</label>
       </fieldset>
-      <label class="toggle"><input type="checkbox" id="show-real"> Show real rank (dashed)</label>
+      <label class="toggle"><input type="checkbox" id="show-real"> Show real rank</label>
       <button id="reset" type="button" class="link-button">Reset to defaults</button>
     </section>
 
@@ -36,7 +36,14 @@
     </section>
 
     <section class="panel">
-      <h2>Rank over time</h2>
+      <div class="chart-heading">
+        <h2>Rank over time</h2>
+        <fieldset class="segmented" aria-label="Rank chart period">
+          <label><input type="radio" name="chart-range" value="1w"> 1w</label>
+          <label><input type="radio" name="chart-range" value="1m"> 1m</label>
+          <label><input type="radio" name="chart-range" value="1y"> 1y</label>
+        </fieldset>
+      </div>
       <div class="chart-wrap"><canvas id="chart" role="img" aria-label="Line chart of rank over time"></canvas></div>
     </section>
 

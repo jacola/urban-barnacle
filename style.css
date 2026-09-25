@@ -180,6 +180,10 @@ code { font-size: 0.9em; }
 .down { color: var(--down); }
 
 .chart-wrap { position: relative; height: 420px; }
+.chart-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.chart-heading h2 { margin: 0; }
+.rankings-chart { height: 360px; }
+.rankings-chart canvas[hidden] { display: none !important; }
 
 /* history table */
 .table-wrap { overflow-x: auto; }
@@ -262,5 +266,6 @@ footer p { margin: 0 0 8px; }
 
 @media (max-width: 600px) {
   .chart-wrap { height: 320px; }
+  .rankings-chart { height: 300px; }
   th, td { padding: 5px 6px; }
 }

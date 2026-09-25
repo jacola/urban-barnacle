@@ -5,6 +5,8 @@
   const COLORS = ["#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed", "#db2777", "#0891b2", "#65a30d"];
   const STORAGE_KEY = "powerrank.selected";
   const VIEW_KEY = "powerrank.view";
+  const CHART_RANGE_KEY = "powerrank.chartRange";
+  const CHART_RANGE_DAYS = { "1w": 7, "1m": 30, "1y": 365 };
   const TABLE_ROWS = 30;
   const NEXT_ROWS = 5;
 
@@ -13,6 +15,7 @@
   const data = { players: null };
   let selected = [];
   let view = "overall"; // "overall" ranks or "path" (rank within the player's path Top 250)
+  let chartRange = "1m";
   let chart = null;
   let showAllRows = false;
 
@@ -452,47 +455,39 @@
   // ------------------------------------------------------------------ chart
 
   function renderChart() {
+    if (typeof Chart === "undefined") return;
     const dates = data.players.dates;
     const inPath = view === "path";
     const showReal = !inPath && document.getElementById("show-real").checked;
+    const latest = dates[dates.length - 1];
+    const cutoff = new Date(Date.parse(`${latest}T00:00:00Z`) - (CHART_RANGE_DAYS[chartRange] - 1) * 86400000)
+      .toISOString().slice(0, 10);
+    const visibleDates = dates.map((date, i) => ({ date, i })).filter(({ date }) => date >= cutoff);
     const datasets = [];
     const values = [];
 
     selected.forEach((key, index) => {
       const p = player(key);
       if (!p) return;
-      const points = dates.map((date, i) => ({ x: date, y: viewRankOn(p, i) }));
+      const points = visibleDates.map(({ date, i }) => {
+        if (showReal) {
+          const real = realRankOn(p, i);
+          return { x: date, y: real ? real.rank : null, real };
+        }
+        return { x: date, y: viewRankOn(p, i) };
+      });
       points.forEach((pt) => pt.y != null && values.push(pt.y));
       datasets.push({
-        label: inPath && p.path ? `${p.name} (${pathName(p.path)})` : p.name,
+        label: showReal ? `${p.name} (real)` : inPath && p.path ? `${p.name} (${pathName(p.path)})` : p.name,
         data: points,
         borderColor: color(index),
         backgroundColor: color(index),
         borderWidth: 2,
-        pointRadius: dates.length > 120 ? 0 : 3,
+        pointRadius: visibleDates.length > 120 ? 0 : 3,
         pointHoverRadius: 5,
         tension: 0.15,
         spanGaps: false,
       });
-      if (showReal) {
-        const realPoints = dates.map((date, i) => {
-          const real = realRankOn(p, i);
-          return { x: date, y: real ? real.rank : null, real };
-        });
-        realPoints.forEach((pt) => pt.y != null && values.push(pt.y));
-        datasets.push({
-          label: `${p.name} (real)`,
-          data: realPoints,
-          borderColor: color(index),
-          backgroundColor: "transparent",
-          borderWidth: 2,
-          borderDash: [6, 4],
-          pointRadius: 0,
-          pointHoverRadius: 4,
-          tension: 0.15,
-          spanGaps: false,
-        });
-      }
     });
 
     const maxRank = values.length ? Math.max(...values) : 100;
@@ -513,6 +508,8 @@
         scales: {
           x: {
             type: "time",
+            min: cutoff,
+            max: latest,
             time: { minUnit: "day", tooltipFormat: "yyyy-MM-dd" },
             ticks: { maxRotation: 0, autoSkipPadding: 16 },
             grid: { display: false },
@@ -657,6 +654,12 @@
 
     selected = readSelection();
     view = readView();
+    try {
+      const saved = localStorage.getItem(CHART_RANGE_KEY);
+      if (Object.hasOwn(CHART_RANGE_DAYS, saved)) chartRange = saved;
+    } catch (error) {
+      /* storage unavailable */
+    }
     setupSearch();
     document.querySelectorAll('input[name="view"]').forEach((input) => {
       input.checked = input.value === view;
@@ -664,6 +667,18 @@
     });
     document.getElementById("show-real").disabled = view === "path";
     document.getElementById("show-real").addEventListener("change", renderChart);
+    document.querySelectorAll('input[name="chart-range"]').forEach((input) => {
+      input.checked = input.value === chartRange;
+      input.addEventListener("change", () => {
+        chartRange = input.value;
+        try {
+          localStorage.setItem(CHART_RANGE_KEY, chartRange);
+        } catch (error) {
+          /* storage unavailable */
+        }
+        renderChart();
+      });
+    });
     document.getElementById("reset").addEventListener("click", resetSelection);
     document.getElementById("show-all").addEventListener("click", () => {
       showAllRows = !showAllRows;

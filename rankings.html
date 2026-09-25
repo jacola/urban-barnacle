@@ -37,6 +37,14 @@
       <label class="toggle"><input type="checkbox" id="visible-only"> Only visible stats</label>
     </section>
 
+    <section class="panel">
+      <h2 id="rank-chart-title">Power by rank</h2>
+      <div class="chart-wrap rankings-chart">
+        <canvas id="rank-chart" role="img" aria-label="Power by rank for players with visible stats"></canvas>
+        <p id="chart-status" class="muted" hidden></p>
+      </div>
+    </section>
+
     <section class="panel board-panel">
       <div class="board-wrap">
         <table id="board" class="board">
@@ -59,6 +67,7 @@
     </p>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
   <script src="common.js"></script>
   <script src="rankings.js"></script>
 </body>
