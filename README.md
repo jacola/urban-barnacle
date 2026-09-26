@@ -21,10 +21,10 @@ clan, activity, registration and power to next. Checkbox menus filter multiple
 values within each category, including unknown values. Power evidence is
 separated into observed values, last-known values, ranking bounds, mark
 minimums and unknowns; sorting never treats a minimum as an exact stat.
-Path/subpath and mark artwork is copied locally from Nexus Atlas, including
-the [subpath index](https://www.nexusatlas.com/subpaths/index.php) and the
-[mark quests](https://www.nexusatlas.com/quests/index.php). The page crops
-the mark artwork to show only its symbol. The chart below the unified table
+The four path icons are copied locally from Nexus Atlas. Mark and subpath
+icons are supplied by the site owner; four NPC subpath icons are also included
+for future directory coverage. The [subpath index](https://www.nexusatlas.com/subpaths/index.php)
+provides subpath-to-path mapping. The chart below the unified table
 uses the same search and filters, with overall/path and power/vita/mana
 controls. Only ranked players with visible stats can be plotted by rank.
 

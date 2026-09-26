@@ -17,7 +17,7 @@
   const EVIDENCE = ["Observed", "Last known", "Rank bounds", "Mark minimum", UNKNOWN];
   const RANKING = ["Top 1000", "Path Top 250 only", "Outside rankings"];
   const ICONS = {
-    marks: { "Il San": "il-san", "Ee San": "ee-san", "Sam San": "sam-san", "Sa San": "sa-san" },
+    marks: { "Il San": "il", "Ee San": "ee", "Sam San": "sam", "Sa San": "sa" },
     paths: new Set(["Warrior", "Rogue", "Mage", "Poet"]),
     subpaths: new Set(SUBPATHS.filter((name) => name !== UNKNOWN)),
   };
@@ -87,8 +87,9 @@
   function icon(type, name) {
     const file = type === "marks" ? ICONS.marks[name] : name.toLowerCase();
     if (!file || (type !== "marks" && !ICONS[type].has(name))) return null;
-    const img = el("img", { class: type === "marks" ? "mark-icon" : type === "subpaths" ? "subpath-icon" : "player-icon", src: `assets/${type}/${file}.gif`, alt: type === "marks" ? name : "", loading: "lazy" });
-    return type === "marks" ? el("span", { class: `mark-symbol ${file}`, title: name }, img) : img;
+    return el("img", { class: type === "marks" ? "mark-icon" : type === "subpaths" ? "subpath-icon" : "player-icon",
+      src: `assets/${type}/${file}.${type === "paths" ? "gif" : "png"}`,
+      alt: type === "marks" ? name : "", title: type === "marks" ? name : "", loading: "lazy" });
   }
 
   function values(row, field) {
