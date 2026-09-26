@@ -8,9 +8,9 @@
 </head>
 <body class="wide">
   <header>
-    <nav class="nav"><a href="./">Tracker</a><a href="directory.html" aria-current="page">Players</a><a href="rankings.html">Ranking chart</a></nav>
+    <nav class="nav"><a href="./">Tracker</a><a href="directory.html" aria-current="page">Players</a></nav>
     <h1>Player power list</h1>
-    <p class="sub">Official rankings and all known players in one table. Click a column to sort; use the checkbox menus to combine filters. Observed power, rank bounds and mark minimums are labeled separately. <span id="directory-meta" class="muted"></span></p>
+    <p class="sub">Official rankings and all known players in one table. Click a column to sort; use the checkbox menus to combine filters. Observed power, rank bounds and mark minimums are labeled separately. <a href="#chart">View chart</a>. <span id="directory-meta" class="muted"></span></p>
   </header>
   <main>
     <section class="toolbar player-filters">
@@ -23,11 +23,22 @@
       <p id="directory-count" class="muted"></p>
       <button id="directory-more" type="button" hidden>Show more</button>
     </section>
+    <section class="panel" id="chart">
+      <div class="chart-heading"><h2 id="rank-chart-title">Power by rank</h2>
+        <div class="chart-controls">
+          <label>List <select id="chart-list"><option value="overall">Overall Top 1000</option><option value="warrior">Warriors Top 250</option><option value="rogue">Rogues Top 250</option><option value="mage">Mages Top 250</option><option value="poet">Poets Top 250</option></select></label>
+          <label>Metric <select id="chart-metric"><option value="power">Power</option><option value="vita">Vita</option><option value="mana">Mana</option></select></label>
+        </div>
+      </div>
+      <p class="muted" id="chart-note">Only ranked players with visible stats can appear on a rank chart. Search and filters above also apply here.</p>
+      <div class="chart-wrap rankings-chart"><canvas id="rank-chart" role="img" aria-label="Power by official rank"></canvas><p id="chart-status" class="muted" hidden></p></div>
+    </section>
   </main>
   <footer class="muted">
     <p>Power is vita + 2 × mana. A number is an observed value as of its check date; a range is bounded by neighbours in an official ranking; ≥ is a mark-based minimum. Values from earlier checks say “last known.” Estimates do not assign an unofficial rank. “To next” applies only when the player and the next better-ranked player have visible power.</p>
     <p>Activity from official clan and subpath lists: active means played within 15 days, inactive means 15–30 days, and absent means 30+ days. A blank field means the sources do not establish it. Icons from <a href="https://www.nexusatlas.com/userlist.php">Nexus Atlas</a>.</p>
   </footer>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
   <script src="common.js"></script>
   <script src="directory.js"></script>
 </body>

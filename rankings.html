@@ -3,72 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Rankings · NexusTK Power Rank Tracker</title>
-  <link rel="stylesheet" href="style.css">
+  <meta http-equiv="refresh" content="0; url=directory.html#chart">
+  <title>Players · NexusTK Power Rank Tracker</title>
+  <link rel="canonical" href="directory.html#chart">
 </head>
-<body class="wide">
-  <header>
-    <nav class="nav"><a href="./">Tracker</a><a href="directory.html">Players</a><a href="rankings.html" aria-current="page">Ranking chart</a></nav>
-    <h1>Extended rankings</h1>
-    <p class="sub">
-      Today's ranking lists with the stats behind them: vita, mana, power and how far each player is from the
-      nearest better-ranked player with visible stats.
-      <span id="meta" class="muted"></span>
-    </p>
-  </header>
-
-  <main>
-    <section class="toolbar">
-      <fieldset class="segmented" aria-label="Ranking list">
-        <label><input type="radio" name="list" value="overall" checked> Overall</label>
-        <label><input type="radio" name="list" value="warrior"> Warriors</label>
-        <label><input type="radio" name="list" value="rogue"> Rogues</label>
-        <label><input type="radio" name="list" value="mage"> Mages</label>
-        <label><input type="radio" name="list" value="poet"> Poets</label>
-      </fieldset>
-      <fieldset class="segmented" aria-label="Rank by">
-        <label><input type="radio" name="metric" value="power" checked> By power</label>
-        <label><input type="radio" name="metric" value="vita"> By vita</label>
-        <label><input type="radio" name="metric" value="mana"> By mana</label>
-      </fieldset>
-      <div class="search">
-        <input id="filter" type="search" placeholder="Filter by name" autocomplete="off" spellcheck="false" aria-label="Filter by name">
-      </div>
-      <label class="toggle"><input type="checkbox" id="visible-only"> Only visible stats</label>
-    </section>
-
-    <section class="panel">
-      <h2 id="rank-chart-title">Power by rank</h2>
-      <div class="chart-wrap rankings-chart">
-        <canvas id="rank-chart" role="img" aria-label="Power by rank for players with visible stats"></canvas>
-        <p id="chart-status" class="muted" hidden></p>
-      </div>
-    </section>
-
-    <section class="panel board-panel">
-      <div class="board-wrap">
-        <table id="board" class="board">
-          <thead></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <p id="empty" class="muted" hidden>No players match.</p>
-    </section>
-  </main>
-
-  <footer class="muted">
-    <p>
-      <strong>To next</strong> is the power needed to pass the nearest better-ranked player on this list whose
-      character page shows stats (players with hidden stats or no page are skipped).
-      <strong>By vita / by mana</strong> re-rank the list by that stat alone (ties share a rank); players whose
-      stats are hidden cannot be placed and are left out. Click a numeric column header
-      to sort by it; the highlighted rows are the characters from <code>config.json</code>.
-      Data: <a href="data/players.json">players.json</a>.
-    </p>
-  </footer>
-
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
-  <script src="common.js"></script>
-  <script src="rankings.js"></script>
+<body>
+  <p>The ranking chart is now part of <a href="directory.html#chart">Players</a>.</p>
 </body>
 </html>
