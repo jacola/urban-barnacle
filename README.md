@@ -23,11 +23,12 @@ separated into observed values, last-known values, ranking bounds, mark
 minimums and unknowns; sorting never treats a minimum as an exact stat.
 Path/subpath and mark artwork is copied locally from Nexus Atlas, including
 the [subpath index](https://www.nexusatlas.com/subpaths/index.php) and the
-[mark quests](https://www.nexusatlas.com/quests/index.php).
+[mark quests](https://www.nexusatlas.com/quests/index.php). The page crops
+the mark artwork to show only its symbol. The chart below the unified table
+uses the same search and filters, with overall/path and power/vita/mana
+controls. Only ranked players with visible stats can be plotted by rank.
 
-The older **Ranking chart** (`rankings.html`) remains available for the
-overall Top 1000 and per-path Top 250. Its chart plots the selected metric
-against official rank; vita and mana can also be re-ranked within those lists.
+The old `rankings.html` address redirects to the chart on Players.
 
 * **Search box** – type a name to add any character who has ever appeared on
   the list; press **×** on a card to remove it. The selection is kept in the
@@ -83,7 +84,7 @@ power.
 | `data/directory.json` | Latest full directory with links to its A–Z and clan/subpath sources, refreshed daily. Activity and membership are a current snapshot rather than historical rank data. |
 | `data/history.json` | Human-readable daily record (stats, next player, real rank) for the `config.json` characters. Derived. |
 | `index.html`, `app.js` | The tracker page (Chart.js via CDN). |
-| `rankings.html`, `rankings.js` | The extended rankings page. |
+| `rankings.html` | Redirect from the former separate rankings page to the Players chart. |
 | `common.js`, `style.css` | Shared helpers and styles. |
 | `.github/workflows/fetch.yml` | Daily cron: fetch + build + directory, then commit the result. |
 

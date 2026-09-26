@@ -53,6 +53,7 @@
   let rankingDate = "";
   let sortKey = "rank";
   let sortDir = 1;
+  let chart = null;
   const selected = {};
 
   function markGroup(mark) {
@@ -86,7 +87,8 @@
   function icon(type, name) {
     const file = type === "marks" ? ICONS.marks[name] : name.toLowerCase();
     if (!file || (type !== "marks" && !ICONS[type].has(name))) return null;
-    return el("img", { class: type === "marks" ? "mark-icon" : type === "subpaths" ? "subpath-icon" : "player-icon", src: `assets/${type}/${file}.gif`, alt: type === "marks" ? name : "", loading: "lazy" });
+    const img = el("img", { class: type === "marks" ? "mark-icon" : type === "subpaths" ? "subpath-icon" : "player-icon", src: `assets/${type}/${file}.gif`, alt: type === "marks" ? name : "", loading: "lazy" });
+    return type === "marks" ? el("span", { class: `mark-symbol ${file}`, title: name }, img) : img;
   }
 
   function values(row, field) {
@@ -189,6 +191,58 @@
     document.getElementById("directory-body").replaceChildren(...matches.slice(0, shown).map(renderRow));
     document.getElementById("directory-count").textContent = `Showing ${fmt(Math.min(shown, matches.length))} of ${fmt(matches.length)} matching players (${fmt(rows.length)} known).`;
     document.getElementById("directory-more").hidden = shown >= matches.length;
+    renderChart(matches);
+  }
+
+  function renderChart(matches) {
+    const list = document.getElementById("chart-list").value;
+    const metric = document.getElementById("chart-metric").value;
+    const label = { power: "Power", vita: "Vita", mana: "Mana" }[metric];
+    const rankKey = list === "overall" ? "rank" : "pathRank";
+    const ranked = matches.filter((row) => row[rankKey] != null && (list === "overall" || row.path === list));
+    const visible = ranked.filter((row) => row.today?.[metric] != null);
+    if (metric !== "power") visible.sort((a, b) => b.today[metric] - a.today[metric] || a[rankKey] - b[rankKey]);
+    const points = visible.map((row, i) => ({
+      x: metric === "power" ? row[rankKey] : i > 0 && row.today[metric] === visible[i - 1].today[metric] ? null : i + 1,
+      y: row.today[metric], name: row.name,
+    }));
+    // Players tied on vita or mana share the same competition rank.
+    if (metric !== "power") {
+      let tiedRank = 1;
+      points.forEach((point) => { if (point.x == null) point.x = tiedRank; else tiedRank = point.x; });
+    }
+    points.sort((a, b) => a.x - b.x || a.name.localeCompare(b.name));
+    const title = `${label} by ${metric === "power" ? "official" : label.toLowerCase()} ${list === "overall" ? "rank" : `${pathName(list)} rank`}`;
+    const canvas = document.getElementById("rank-chart");
+    const status = document.getElementById("chart-status");
+    document.getElementById("rank-chart-title").textContent = title;
+    canvas.setAttribute("aria-label", `${title} for players with visible stats`);
+    if (chart) { chart.destroy(); chart = null; }
+    if (!points.length || typeof Chart === "undefined") {
+      canvas.hidden = true;
+      status.textContent = points.length ? "Chart library failed to load." : "No ranked players with visible stats match these filters.";
+      status.hidden = false;
+      return;
+    }
+    canvas.hidden = false;
+    status.hidden = true;
+    chart = new Chart(canvas, {
+      type: "line",
+      data: { datasets: [{ data: points, borderColor: "#2563eb", backgroundColor: "#2563eb", borderWidth: 2,
+        pointRadius: points.length > 200 ? 1 : 2, pointHoverRadius: 5, tension: 0 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: {
+          title: (items) => items.length ? `#${items[0].raw.x} ${items[0].raw.name}` : "",
+          label: (item) => `${label}: ${fmt(item.raw.y)}`,
+        } } },
+        scales: {
+          x: { type: "linear", min: 1, max: Math.max(2, metric === "power" ? (list === "overall" ? 1000 : 250) : visible.length),
+            title: { display: true, text: metric === "power" ? "Official rank" : `Rank by ${label.toLowerCase()}` }, ticks: { precision: 0 } },
+          y: { title: { display: true, text: label }, ticks: { callback: (value) => fmt(value) } },
+        },
+      },
+    });
   }
 
   function updateFilterSummary(filter, summary) {
@@ -266,6 +320,7 @@
       renderFilters();
       document.getElementById("directory-meta").textContent = `Rankings ${rankingDate} · directory ${directoryDate}.`;
       document.getElementById("directory-search").addEventListener("input", () => { shown = PAGE_SIZE; render(); });
+      for (const id of ["chart-list", "chart-metric"]) document.getElementById(id).addEventListener("change", () => renderChart(filtered()));
       document.getElementById("directory-more").addEventListener("click", () => { shown += PAGE_SIZE; render(); });
       document.getElementById("directory-reset").addEventListener("click", () => {
         document.getElementById("directory-search").value = "";

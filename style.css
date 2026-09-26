@@ -101,7 +101,12 @@ code { font-size: 0.9em; }
 .filter-actions button { border: 0; background: #eef2ff; border-radius: 4px; padding: 3px 9px; cursor: pointer; }
 .player-icon { width: 18px; height: 18px; object-fit: contain; vertical-align: middle; margin-right: 4px; image-rendering: pixelated; }
 .subpath-icon { width: 28px; height: 28px; object-fit: contain; vertical-align: middle; margin-right: 4px; image-rendering: pixelated; }
-.mark-icon { width: auto; height: auto; max-height: 16px; vertical-align: middle; image-rendering: pixelated; }
+.mark-symbol { display: inline-block; width: 19px; height: 16px; overflow: hidden; vertical-align: middle; }
+.mark-symbol.sa-san { width: 25px; }
+.mark-icon { display: block; width: auto; height: auto; max-width: none; image-rendering: pixelated; }
+.chart-controls { display: flex; flex-wrap: wrap; gap: 12px; }
+.chart-controls select { padding: 6px 8px; font: inherit; }
+#chart-note { margin-top: 0; }
 .player-board { min-width: 1500px; }
 .board-wrap:has(.player-board) { overflow-x: auto; }
 .player-board th:first-child, .player-board td:first-child { position: sticky; left: 0; z-index: 2; background: var(--panel); }
