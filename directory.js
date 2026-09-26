@@ -42,8 +42,7 @@
     { id: "subpath", label: "Subpath", text: true },
     { id: "mark", label: "Mark", defaultDesc: true },
     { id: "clan", label: "Clan", text: true },
-    { id: "activity", label: "Activity", text: true },
-    { id: "registration", label: "Registration", text: true },
+    { id: "lastActive", label: "Last active", defaultDesc: true },
     { id: "gap", label: "To next", number: true },
   ];
 
@@ -59,6 +58,23 @@
   function markGroup(mark) {
     if (!mark) return UNKNOWN;
     return /^Level \d+$/i.test(mark) && mark !== "Level 99" ? "Below 99" : mark;
+  }
+
+  function lastActive(activity) {
+    if (!activity || !directoryDate) return { label: "—", sort: null, title: "No activity information in the membership lists" };
+    const checked = new Date(`${directoryDate}T00:00:00Z`);
+    const daysAgo = (days) => new Date(checked.getTime() - days * 86400000);
+    const shortDate = (date) => new Intl.DateTimeFormat("en-US", {
+      month: "short", day: "numeric", ...(date.getUTCFullYear() !== checked.getUTCFullYear() ? { year: "numeric" } : {}),
+      timeZone: "UTC",
+    }).format(date);
+    const fifteen = daysAgo(15), thirty = daysAgo(30);
+    const label = activity === "active" ? `${shortDate(fifteen)}–${shortDate(checked)}`
+      : activity === "inactive" ? `${shortDate(thirty)}–${shortDate(fifteen)}`
+      : activity === "absent" ? `Before ${shortDate(thirty)}` : "—";
+    const newest = activity === "active" ? checked : activity === "inactive" ? fifteen : activity === "absent" ? thirty : null;
+    return { label, sort: newest?.getTime() ?? null,
+      title: `Estimated from the ${activity} activity indicator checked ${directoryDate}; no exact login date is published` };
   }
 
   function evidence(row) {
@@ -89,7 +105,7 @@
     if (!file || (type !== "marks" && !ICONS[type].has(name))) return null;
     return el("img", { class: type === "marks" ? "mark-icon" : type === "subpaths" ? "subpath-icon" : "player-icon",
       src: `assets/${type}/${file}.${type === "paths" ? "gif" : "png"}`,
-      alt: type === "marks" ? name : "", title: type === "marks" ? name : "", loading: "lazy" });
+      alt: type === "marks" || type === "subpaths" ? name : "", title: type === "marks" || type === "subpaths" ? name : "", loading: "lazy" });
   }
 
   function values(row, field) {
@@ -124,8 +140,7 @@
       case "subpath": return row.subpaths[0];
       case "mark": return { "Sa San": 4, "Sam San": 3, "Ee San": 2, "Il San": 1 }[row.mark] ?? (/^Level \d+$/.test(row.mark || "") ? Number(row.mark.slice(6)) / 100 : null);
       case "clan": return row.clans[0];
-      case "activity": return row.activity;
-      case "registration": return row.registration;
+      case "lastActive": return row.lastActive.sort;
       case "gap": return row.today?.next?.gap;
       default: return null;
     }
@@ -168,7 +183,7 @@
     const player = el("td", { class: "player", title: row.sources.join(" · ") }, link(row.key, row.name));
     if (row.tracked) player.append(" ", el("a", { class: "chart-link", href: `./#p=${encodeURIComponent(row.key)}` }, "chart"));
     const powerTitle = e.value != null ? `Vita + 2 × mana, checked ${e.date}` : e.kind === "Rank bounds" ? "Inferred from neighbours on the overall ranking" : e.kind === "Mark minimum" ? `Minimum inferred from ${row.mark}` : "No public power evidence";
-    const subpath = el("td", {}, ...row.subpaths.flatMap((name, i) => [i ? ", " : "", icon("subpaths", name), name].filter(Boolean)));
+    const subpath = el("td", { title: row.subpaths.join(", ") }, ...row.subpaths.map((name) => icon("subpaths", name)).filter(Boolean));
     if (!row.subpaths.length) subpath.append("—");
     const mark = el("td", {}, icon("marks", row.mark) || row.mark || "—");
     const path = row.path ? pathName(row.path) : null;
@@ -181,8 +196,7 @@
       el("td", { class: "num" }, row.pathRank != null ? `#${row.pathRank}` : "—"),
       el("td", { title: row.inferredPath ? "Path inferred from the listed subpath" : "" }, path ? icon("paths", path) : "", path || "—"), subpath, mark,
       el("td", {}, row.clans.join(", ") || "—"),
-      el("td", {}, row.activity || "—"),
-      el("td", {}, row.registration || "—"),
+      el("td", { title: row.lastActive.title }, row.lastActive.label),
       el("td", { class: "num" }, row.today?.next?.gap != null ? fmt(row.today.next.gap) : "—"));
   }
 
@@ -315,6 +329,7 @@
           today, stats, tracked: tracked.has(key),
         };
         row.evidence = evidence(row);
+        row.lastActive = lastActive(row.activity);
         return row;
       });
       FILTERS.find((filter) => filter.id === "clan").options = [...new Set(rows.flatMap((row) => row.clans))].sort().concat(UNKNOWN);
