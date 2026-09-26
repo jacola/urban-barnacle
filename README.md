@@ -12,22 +12,22 @@ on their character pages.
 
 ## What the site shows
 
-The site has three pages: the **Tracker** (`index.html`) for following selected
-characters over time, and **Rankings** (`rankings.html`), an extended version
-of the ranking lists showing every player's vita, mana, power, gap to the
-nearest better-ranked player with visible stats, and real rank, for the
-overall Top 1000 and each path Top 250. Any list can also be re-ranked **by
-vita** or **by mana** alone (handy for mages and poets), with the gap to the
-next player measured in that stat. Numeric columns are sortable and rows can
-be filtered by name. A chart above the rankings table plots the selected
-metric against rank for players with visible stats; list and name filters
-apply to both the chart and table. **All players** (`directory.html`) joins the
-ranking data with the official A–Z character indexes and the clan/subpath
-lists linked from [Nexus Atlas](https://www.nexusatlas.com/userlist.php). It
-shows unregistered players, mark, membership and activity ranges even when a
-character is outside the ranking lists. Search or filter by power evidence,
-activity and registration. Only exact visible stats are given a power value;
-mark prerequisites are displayed as `≥` lower bounds, never an invented rank.
+The **Tracker** (`index.html`) follows selected characters over time.
+**Players** (`directory.html`) joins the official Top 1000 and per-path Top 250
+with the A–Z character indexes and the clan/subpath lists linked from
+[Nexus Atlas](https://www.nexusatlas.com/userlist.php). Its columns sort by
+name, numeric power, vita, mana, official and path rank, path, subpath, mark,
+clan, activity, registration and power to next. Checkbox menus filter multiple
+values within each category, including unknown values. Power evidence is
+separated into observed values, last-known values, ranking bounds, mark
+minimums and unknowns; sorting never treats a minimum as an exact stat.
+Path/subpath and mark artwork is copied locally from Nexus Atlas, including
+the [subpath index](https://www.nexusatlas.com/subpaths/index.php) and the
+[mark quests](https://www.nexusatlas.com/quests/index.php).
+
+The older **Ranking chart** (`rankings.html`) remains available for the
+overall Top 1000 and per-path Top 250. Its chart plots the selected metric
+against official rank; vita and mana can also be re-ranked within those lists.
 
 * **Search box** – type a name to add any character who has ever appeared on
   the list; press **×** on a card to remove it. The selection is kept in the
