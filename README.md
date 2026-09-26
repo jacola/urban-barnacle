@@ -17,7 +17,7 @@ The **Tracker** (`index.html`) follows selected characters over time.
 with the A–Z character indexes and the clan/subpath lists linked from
 [Nexus Atlas](https://www.nexusatlas.com/userlist.php). Its columns sort by
 name, numeric power, vita, mana, official and path rank, path, subpath, mark,
-clan, estimated last-active range and power to next. Checkbox menus filter multiple
+clan, last observed active date and power to next. Checkbox menus filter multiple
 values within each category, including activity and registration even though
 these are no longer separate columns. Subpaths display icons only, with names
 available on hover and to screen readers. Power evidence is
@@ -151,6 +151,9 @@ tracked characters and their neighbours are still refreshed daily.
 
 The official membership legend defines active as played within 15 days,
 inactive as 15–30 days, and absent as 30+ days. It does not provide a precise
-last-login timestamp. A–Z entries show only names and titles; a missing mark
-or activity means unknown. Mark lower bounds follow the game's Il/Ee/Sam/Sa
+last-login timestamp. The Players table records the last directory date on
+which a player was observed with an active indicator, starting with this
+feature's first snapshot. N/A means no such observation yet. A–Z entries
+confirm registration but show only names and titles; a missing mark or
+activity means unknown. Mark lower bounds follow the game's Il/Ee/Sam/Sa
 San requirements (160k/320k/640k/1.28m power); a player can have much more.
