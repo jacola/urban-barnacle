@@ -329,9 +329,12 @@ def cmd_directory(args):
     for entry in entries.values():
         entry["min_power"] = MARK_POWER.get(entry.get("level_mark"))
     previous_entries = {}
+    previous_date = None
     if DIRECTORY_PATH.exists():
         with DIRECTORY_PATH.open(encoding="utf-8") as fh:
-            previous_entries = json.load(fh).get("entries", {})
+            previous = json.load(fh)
+            previous_entries = previous.get("entries", {})
+            previous_date = previous.get("date")
     with PLAYERS_PATH.open(encoding="utf-8") as fh:
         ranked_players = json.load(fh).get("players", {})
     for key, entry in entries.items():
@@ -339,6 +342,19 @@ def cmd_directory(args):
         for field in ("stats", "stats_checked", "stats_status"):
             if field in prior:
                 entry[field] = prior[field]
+        if entry.get("activity") == "active":
+            entry["last_active_seen"] = date
+        elif prior.get("last_active_seen"):
+            entry["last_active_seen"] = prior["last_active_seen"]
+        elif prior.get("activity") == "active" and previous_date:
+            entry["last_active_seen"] = previous_date
+        ranked_today = ranked_players.get(key, {}).get("today") or {}
+        if entry.get("registration") is None and (
+            any(source.startswith("letter-") for source in entry["sources"])
+            or ranked_today.get("rank") is not None
+            or ranked_today.get("path_rank") is not None
+        ):
+            entry["registration"] = "registered"
     # Slowly fill the gap beyond the Top 1000; keep earlier successful checks.
     candidates = []
     for key, entry in entries.items():

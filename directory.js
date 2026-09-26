@@ -60,21 +60,10 @@
     return /^Level \d+$/i.test(mark) && mark !== "Level 99" ? "Below 99" : mark;
   }
 
-  function lastActive(activity) {
-    if (!activity || !directoryDate) return { label: "—", sort: null, title: "No activity information in the membership lists" };
-    const checked = new Date(`${directoryDate}T00:00:00Z`);
-    const daysAgo = (days) => new Date(checked.getTime() - days * 86400000);
-    const shortDate = (date) => new Intl.DateTimeFormat("en-US", {
-      month: "short", day: "numeric", ...(date.getUTCFullYear() !== checked.getUTCFullYear() ? { year: "numeric" } : {}),
-      timeZone: "UTC",
-    }).format(date);
-    const fifteen = daysAgo(15), thirty = daysAgo(30);
-    const label = activity === "active" ? `${shortDate(fifteen)}–${shortDate(checked)}`
-      : activity === "inactive" ? `${shortDate(thirty)}–${shortDate(fifteen)}`
-      : activity === "absent" ? `Before ${shortDate(thirty)}` : "—";
-    const newest = activity === "active" ? checked : activity === "inactive" ? fifteen : activity === "absent" ? thirty : null;
-    return { label, sort: newest?.getTime() ?? null,
-      title: `Estimated from the ${activity} activity indicator checked ${directoryDate}; no exact login date is published` };
+  function lastActive(activity, lastObserved) {
+    const date = activity === "active" ? directoryDate : lastObserved;
+    return { label: date || "N/A", sort: date || null,
+      title: date ? `Last observed with an active indicator on ${date}; the exact login date is not published` : "No active observation yet" };
   }
 
   function evidence(row) {
@@ -321,7 +310,8 @@
         const inferredPath = !today?.path_rank && mappedPaths.length === 1;
         const row = {
           key, name: entry.name || p?.name || key, mark: entry.level_mark,
-          min_power: entry.min_power, activity: entry.activity, registration: entry.registration,
+          min_power: entry.min_power, activity: entry.activity,
+          registration: entry.registration ?? ((entry.sources || []).some((source) => source.startsWith("letter-")) || today?.rank != null || today?.path_rank != null ? "registered" : null),
           clans: entry.clans || [], subpaths,
           sources: (entry.sources || []).map((source) => directory.source_urls?.[source] || source),
           path: inferredPath ? mappedPaths[0] : p?.path, inferredPath,
@@ -329,7 +319,7 @@
           today, stats, tracked: tracked.has(key),
         };
         row.evidence = evidence(row);
-        row.lastActive = lastActive(row.activity);
+        row.lastActive = lastActive(row.activity, entry.last_active_seen);
         return row;
       });
       FILTERS.find((filter) => filter.id === "clan").options = [...new Set(rows.flatMap((row) => row.clans))].sort().concat(UNKNOWN);
