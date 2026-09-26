@@ -105,7 +105,7 @@ code { font-size: 0.9em; }
 .chart-controls { display: flex; flex-wrap: wrap; gap: 12px; }
 .chart-controls select { padding: 6px 8px; font: inherit; }
 #chart-note { margin-top: 0; }
-.player-board { min-width: 1500px; }
+.player-board { min-width: 1300px; }
 .board-wrap:has(.player-board) { overflow-x: auto; }
 .player-board th:first-child, .player-board td:first-child { position: sticky; left: 0; z-index: 2; background: var(--panel); }
 .player-board thead th:first-child { z-index: 3; background: #f0f2f5; }

@@ -17,8 +17,10 @@ The **Tracker** (`index.html`) follows selected characters over time.
 with the A–Z character indexes and the clan/subpath lists linked from
 [Nexus Atlas](https://www.nexusatlas.com/userlist.php). Its columns sort by
 name, numeric power, vita, mana, official and path rank, path, subpath, mark,
-clan, activity, registration and power to next. Checkbox menus filter multiple
-values within each category, including unknown values. Power evidence is
+clan, estimated last-active range and power to next. Checkbox menus filter multiple
+values within each category, including activity and registration even though
+these are no longer separate columns. Subpaths display icons only, with names
+available on hover and to screen readers. Power evidence is
 separated into observed values, last-known values, ranking bounds, mark
 minimums and unknowns; sorting never treats a minimum as an exact stat.
 The four path icons are copied locally from Nexus Atlas. Mark and subpath
