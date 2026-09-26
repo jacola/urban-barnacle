@@ -3,29 +3,31 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>All players · NexusTK Power Rank Tracker</title>
+  <title>Players · NexusTK Power Rank Tracker</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="wide">
   <header>
-    <nav class="nav"><a href="./">Tracker</a><a href="rankings.html">Rankings</a><a href="directory.html" aria-current="page">All players</a></nav>
-    <h1>All known players</h1>
-    <p class="sub">Character pages, clans and subpaths beyond the Top 1000. Exact power comes from visible vita and mana. A mark gives a minimum, not an exact rank. <span id="directory-meta" class="muted"></span></p>
+    <nav class="nav"><a href="./">Tracker</a><a href="directory.html" aria-current="page">Players</a><a href="rankings.html">Ranking chart</a></nav>
+    <h1>Player power list</h1>
+    <p class="sub">Official rankings and all known players in one table. Click a column to sort; use the checkbox menus to combine filters. Observed power, rank bounds and mark minimums are labeled separately. <span id="directory-meta" class="muted"></span></p>
   </header>
   <main>
-    <section class="toolbar">
-      <div class="search"><input id="directory-search" type="search" placeholder="Search players" aria-label="Search players" autocomplete="off"></div>
-      <label>Power <select id="power-filter"><option value="all">All</option><option value="exact">Exact stats</option><option value="minimum">Mark minimum</option><option value="unknown">Unknown</option></select></label>
-      <label>Activity <select id="activity-filter"><option value="all">All</option><option value="active">Active (0–15 days)</option><option value="inactive">Inactive (15–30 days)</option><option value="absent">Absent (30+ days)</option></select></label>
-      <label>Registration <select id="registration-filter"><option value="all">All</option><option value="registered">Registered</option><option value="unregistered">Unregistered</option></select></label>
+    <section class="toolbar player-filters">
+      <div class="search"><input id="directory-search" type="search" placeholder="Search player name" aria-label="Search player name" autocomplete="off"></div>
+      <div id="directory-filters" class="filter-menus" aria-label="Player filters"></div>
+      <button id="directory-reset" type="button">Reset filters</button>
     </section>
     <section class="panel board-panel">
-      <div class="board-wrap"><table class="board"><thead><tr><th>Player</th><th>Power</th><th>Mark</th><th>Path / subpath</th><th>Clan</th><th>Activity</th><th>Registration</th><th>Official #</th></tr></thead><tbody id="directory-body"></tbody></table></div>
+      <div class="board-wrap"><table class="board player-board"><thead id="directory-head"></thead><tbody id="directory-body"></tbody></table></div>
       <p id="directory-count" class="muted"></p>
       <button id="directory-more" type="button" hidden>Show more</button>
     </section>
   </main>
-  <footer class="muted"><p>Mark minimums: Il San 160,000, Ee San 320,000, Sam San 640,000, Sa San 1,280,000 power. They are lower bounds based on mark prerequisites and the formula vita + 2 × mana. Activity is a range from the official list, not a last login timestamp. Membership and activity reflect the directory date above. Sources: <a href="https://www.nexusatlas.com/userlist.php">Nexus Atlas index</a> and the linked official lists.</p></footer>
+  <footer class="muted">
+    <p>Power is vita + 2 × mana. A number is an observed value as of its check date; a range is bounded by neighbours in an official ranking; ≥ is a mark-based minimum. Values from earlier checks say “last known.” Estimates do not assign an unofficial rank. “To next” applies only when the player and the next better-ranked player have visible power.</p>
+    <p>Activity from official clan and subpath lists: active means played within 15 days, inactive means 15–30 days, and absent means 30+ days. A blank field means the sources do not establish it. Icons from <a href="https://www.nexusatlas.com/userlist.php">Nexus Atlas</a>.</p>
+  </footer>
   <script src="common.js"></script>
   <script src="directory.js"></script>
 </body>
