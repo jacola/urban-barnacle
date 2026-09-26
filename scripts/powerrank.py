@@ -34,6 +34,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import Counter
 from pathlib import Path
 
@@ -44,6 +45,12 @@ RAW_DIR = DATA_DIR / "raw"
 SNAPSHOT_DIR = DATA_DIR / "snapshots"
 HISTORY_PATH = DATA_DIR / "history.json"
 PLAYERS_PATH = DATA_DIR / "players.json"
+DIRECTORY_PATH = DATA_DIR / "directory.json"
+DIRECTORY_BASE = "http://users.nexustk.com"
+# These are the official lists linked from Nexus Atlas' user-list index.
+CLANS = "Alizarin Bear Covenant Destiny Dharma Enigma Heavens Kurimja LostKingdom Oceana Pegasus Phoenix Sansin Silla SunMoon The_Forsaken Tiger".split()
+SUBPATHS = "Barbarian Chongun Do Merchant Ranger Spy Diviner Geomancer Shaman Druid Monk Muse".split()
+MARK_POWER = {"Il San": 160000, "Ee San": 320000, "Sam San": 640000, "Sa San": 1280000}
 
 RANKING_URL = "http://users.nexustk.com/webreport/PowerAll.htm"
 # Per-path "Top 250" rankings, refreshed together with the overall list.
@@ -237,6 +244,126 @@ def parse_stats(text):
     values["power"] = power(values["vita"], values["mana"])
     values["status"] = "ok"
     return values
+
+
+def parse_directory_names(text):
+    """A-Z index: only character links have a ?name= query (navigation does not)."""
+    result = {}
+    for key, label in re.findall(r'<a\b[^>]*href="[^"]*\?name=([^"&]+)"[^>]*>(.*?)</a>', text, re.I | re.S):
+        key = urllib.parse.unquote(key).lower()
+        display = html.unescape(re.sub(r"<[^>]+>", "", label)).strip()
+        if re.fullmatch(r"[a-z0-9_]+", key):
+            result[key] = {"name": display.split()[-1], "title": " ".join(display.split()[:-1])}
+    return result
+
+
+def parse_members(text):
+    """Official clan/subpath rows carry a mark and the site's activity icons."""
+    members = {}
+    pattern = re.compile(r'<a\b[^>]*href="[^"]*\?name=([^"&]+)"[^>]*>(.*?)</a>(.*?)(?=<BR\s*/?>|</li>|$)', re.I | re.S)
+    for match in pattern.finditer(text):
+        key = urllib.parse.unquote(match.group(1)).lower()
+        if not re.fullmatch(r"[a-z0-9_]+", key):
+            continue
+        label = html.unescape(re.sub(r"<[^>]+>", "", match.group(2))).strip()
+        # A clan motto may contain parentheses; take the first mark or level after the name.
+        level = re.search(r"\((?:[^)]*? - )?(Level \d+|Il San|Ee San|Sam San|Sa San)\)", label, re.I)
+        name = label.split(" (")[0].split()[0]
+        icons = match.group(3).lower()
+        activities = [name for icon, name in (("buttongreen.gif", "active"), ("buttonyellow.gif", "inactive"), ("buttonred.gif", "absent")) if icon in icons]
+        members[key] = {
+            "name": name, "level_mark": level.group(1).title() if level else None,
+            "activity": activities[0] if len(activities) == 1 else None,
+            "registration": "unregistered" if "notreg.gif" in icons else "registered",
+        }
+    return members
+
+
+def directory_sources():
+    sources = {f"letter-{letter}": f"{DIRECTORY_BASE}/userfiles/{letter}.html" for letter in "abcdefghijklmnopqrstuvwxyz"}
+    sources.update({f"clan-{name}": f"{DIRECTORY_BASE}/webreport/{name}.html" for name in CLANS})
+    sources.update({f"subpath-{name}": f"{DIRECTORY_BASE}/webreport/{name}.htm" for name in SUBPATHS})
+    return sources
+
+
+def cmd_directory(args):
+    """Fetch a current directory independently of the Top 1000 snapshot."""
+    sources = directory_sources()
+    date = args.date or dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
+
+    def fetch_one(item):
+        source, url = item
+        raw = http_get(url)
+        members = parse_directory_names(decode(raw)) if source.startswith("letter-") else parse_members(decode(raw))
+        if not members:
+            raise ValueError(f"{source}: no character rows parsed")
+        return source, url, raw, members
+
+    fetched = {}
+    # A failed page must never turn a missing member into an inferred departure.
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = {pool.submit(fetch_one, item): item[0] for item in sources.items()}
+        for future in as_completed(futures):
+            source, url, raw, members = future.result()
+            fetched[source] = members
+            log(f"  {source}: {len(members)}")
+
+    entries = {}
+    for source in sources:  # deterministic ordering despite parallel downloads
+        members = fetched[source]
+        for key, info in members.items():
+            entry = entries.setdefault(key, {"name": info["name"], "title": "", "clans": [], "subpaths": [], "sources": []})
+            entry["sources"].append(source)
+            if source.startswith("letter-"):
+                entry["name"] = info["name"]
+                entry["title"] = info["title"]
+            else:
+                group = "clans" if source.startswith("clan-") else "subpaths"
+                entry[group].append(source.split("-", 1)[1].replace("_", " "))
+                for field in ("level_mark", "activity", "registration"):
+                    if info[field] is not None:
+                        if field in entry and entry[field] != info[field]:
+                            entry[field] = None  # disagreeing live sources; don't guess
+                        else:
+                            entry[field] = info[field]
+    for entry in entries.values():
+        entry["min_power"] = MARK_POWER.get(entry.get("level_mark"))
+    previous_entries = {}
+    if DIRECTORY_PATH.exists():
+        with DIRECTORY_PATH.open(encoding="utf-8") as fh:
+            previous_entries = json.load(fh).get("entries", {})
+    with PLAYERS_PATH.open(encoding="utf-8") as fh:
+        ranked_players = json.load(fh).get("players", {})
+    for key, entry in entries.items():
+        prior = previous_entries.get(key, {})
+        for field in ("stats", "stats_checked", "stats_status"):
+            if field in prior:
+                entry[field] = prior[field]
+    # Slowly fill the gap beyond the Top 1000; keep earlier successful checks.
+    candidates = []
+    for key, entry in entries.items():
+        if entry.get("registration") != "registered" or ranked_players.get(key, {}).get("stats"):
+            continue
+        checked = entry.get("stats_checked")
+        if checked and (parse_date(date) - parse_date(checked)).days < 30:
+            continue
+        candidates.append(key)
+    candidates.sort(key=lambda key: (entries[key].get("stats_checked") or "", key))
+    delay = load_config()["request_delay_seconds"]
+    for key in candidates[:args.max_lookups]:
+        time.sleep(delay)
+        result = fetch_stats(key)
+        if result["status"] == "error":
+            log(f"  {key}: stats lookup failed ({result.get('error')})")
+            continue
+        entry = entries[key]
+        entry["stats_checked"] = date
+        entry["stats_status"] = result["status"]
+        if result["status"] == "ok":
+            entry["stats"] = {"date": date, "vita": result["vita"], "mana": result["mana"], "power": result["power"]}
+    log(f"Extra character lookups: {min(len(candidates), args.max_lookups)} / {len(candidates)} due")
+    write_json(DIRECTORY_PATH, {"date": date, "fetched_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(), "source_urls": sources, "entries": entries}, indent=None)
+    log(f"Wrote {rel(DIRECTORY_PATH)}: {len(entries)} characters")
 
 
 def fetch_stats(key):
@@ -695,6 +822,10 @@ def main(argv=None):
     fetch.set_defaults(func=cmd_fetch)
     build = sub.add_parser("build", help="rebuild data/history.json and data/players.json from snapshots")
     build.set_defaults(func=cmd_build)
+    directory = sub.add_parser("directory", help="refresh A-Z, clan and subpath directory")
+    directory.add_argument("--date", help="override the directory date (YYYY-MM-DD, default: today UTC)")
+    directory.add_argument("--max-lookups", type=int, default=25, help="extra character stat lookups beyond the ranking lists (default: 25)")
+    directory.set_defaults(func=cmd_directory)
     args = parser.parse_args(argv)
     if args.cache_dir:
         CACHE_DIR = Path(args.cache_dir)
