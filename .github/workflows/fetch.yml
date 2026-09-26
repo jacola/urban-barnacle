@@ -31,6 +31,10 @@ jobs:
       - name: Rebuild history.json and players.json
         run: python scripts/powerrank.py build
 
+      - name: Refresh the full character directory
+        continue-on-error: true
+        run: python scripts/powerrank.py directory
+
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"

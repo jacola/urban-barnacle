@@ -12,7 +12,7 @@ on their character pages.
 
 ## What the site shows
 
-The site has two pages: the **Tracker** (`index.html`) for following selected
+The site has three pages: the **Tracker** (`index.html`) for following selected
 characters over time, and **Rankings** (`rankings.html`), an extended version
 of the ranking lists showing every player's vita, mana, power, gap to the
 nearest better-ranked player with visible stats, and real rank, for the
@@ -21,7 +21,13 @@ vita** or **by mana** alone (handy for mages and poets), with the gap to the
 next player measured in that stat. Numeric columns are sortable and rows can
 be filtered by name. A chart above the rankings table plots the selected
 metric against rank for players with visible stats; list and name filters
-apply to both the chart and table.
+apply to both the chart and table. **All players** (`directory.html`) joins the
+ranking data with the official A–Z character indexes and the clan/subpath
+lists linked from [Nexus Atlas](https://www.nexusatlas.com/userlist.php). It
+shows unregistered players, mark, membership and activity ranges even when a
+character is outside the ranking lists. Search or filter by power evidence,
+activity and registration. Only exact visible stats are given a power value;
+mark prerequisites are displayed as `≥` lower bounds, never an invented rank.
 
 * **Search box** – type a name to add any character who has ever appeared on
   the list; press **×** on a card to remove it. The selection is kept in the
@@ -74,11 +80,12 @@ power.
 | `data/raw/YYYY-MM-DD.htm`, `YYYY-MM-DD-<path>.htm` | Raw archived copies of the overall and per-path ranking pages. |
 | `data/snapshots/YYYY-MM-DD.json` | Parsed rankings (overall and per path) plus every character stat looked up that day. Source of truth. |
 | `data/players.json` | Per-player daily series (rank, power to next, real-rank extras), current state and last-known power for every player ever seen. What the site reads. Derived. |
+| `data/directory.json` | Latest full directory with links to its A–Z and clan/subpath sources, refreshed daily. Activity and membership are a current snapshot rather than historical rank data. |
 | `data/history.json` | Human-readable daily record (stats, next player, real rank) for the `config.json` characters. Derived. |
 | `index.html`, `app.js` | The tracker page (Chart.js via CDN). |
 | `rankings.html`, `rankings.js` | The extended rankings page. |
 | `common.js`, `style.css` | Shared helpers and styles. |
-| `.github/workflows/fetch.yml` | Daily cron: fetch + build, then commit the result. |
+| `.github/workflows/fetch.yml` | Daily cron: fetch + build + directory, then commit the result. |
 
 ## Setup
 
@@ -113,6 +120,7 @@ The site is then served at `https://<user>.github.io/<repo>/`.
 ```sh
 python3 scripts/powerrank.py --cache-dir .cache fetch   # archive today's page + stats
 python3 scripts/powerrank.py build                       # regenerate data/history.json and data/players.json
+python3 scripts/powerrank.py directory                   # fetch all A-Z and clan/subpath lists
 python3 -m http.server 8000                              # open http://localhost:8000
 ```
 
@@ -126,9 +134,20 @@ unwieldy the series can be split into one file per year.
 
 ### Load on users.nexustk.com
 
-The daily job makes five requests for the ranking pages and one request per
+The directory job also checks up to 25 additional registered characters per
+day outside the ranking lists, carrying those stats forward in `directory.json`.
+Use `directory --max-lookups 0` for a source-only refresh.
+
+The daily job makes five requests for the ranking pages, 55 requests for the
+26 A–Z and 29 clan/subpath pages (four concurrent), and one request per
 ranked character (~1060 static HTML files, fetched directly from
 `/userfiles/<name>.html` rather than through the redirecting CGI), paced by
 `request_delay_seconds`. Set `stats_refresh_days` to e.g. `7` to spread the
 lookups over a week (~150 per day) if you want to be lighter on the site;
 tracked characters and their neighbours are still refreshed daily.
+
+The official membership legend defines active as played within 15 days,
+inactive as 15–30 days, and absent as 30+ days. It does not provide a precise
+last-login timestamp. A–Z entries show only names and titles; a missing mark
+or activity means unknown. Mark lower bounds follow the game's Il/Ee/Sam/Sa
+San requirements (160k/320k/640k/1.28m power); a player can have much more.

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>All players · NexusTK Power Rank Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="wide">
+  <header>
+    <nav class="nav"><a href="./">Tracker</a><a href="rankings.html">Rankings</a><a href="directory.html" aria-current="page">All players</a></nav>
+    <h1>All known players</h1>
+    <p class="sub">Character pages, clans and subpaths beyond the Top 1000. Exact power comes from visible vita and mana. A mark gives a minimum, not an exact rank. <span id="directory-meta" class="muted"></span></p>
+  </header>
+  <main>
+    <section class="toolbar">
+      <div class="search"><input id="directory-search" type="search" placeholder="Search players" aria-label="Search players" autocomplete="off"></div>
+      <label>Power <select id="power-filter"><option value="all">All</option><option value="exact">Exact stats</option><option value="minimum">Mark minimum</option><option value="unknown">Unknown</option></select></label>
+      <label>Activity <select id="activity-filter"><option value="all">All</option><option value="active">Active (0–15 days)</option><option value="inactive">Inactive (15–30 days)</option><option value="absent">Absent (30+ days)</option></select></label>
+      <label>Registration <select id="registration-filter"><option value="all">All</option><option value="registered">Registered</option><option value="unregistered">Unregistered</option></select></label>
+    </section>
+    <section class="panel board-panel">
+      <div class="board-wrap"><table class="board"><thead><tr><th>Player</th><th>Power</th><th>Mark</th><th>Path / subpath</th><th>Clan</th><th>Activity</th><th>Registration</th><th>Official #</th></tr></thead><tbody id="directory-body"></tbody></table></div>
+      <p id="directory-count" class="muted"></p>
+      <button id="directory-more" type="button" hidden>Show more</button>
+    </section>
+  </main>
+  <footer class="muted"><p>Mark minimums: Il San 160,000, Ee San 320,000, Sam San 640,000, Sa San 1,280,000 power. They are lower bounds based on mark prerequisites and the formula vita + 2 × mana. Activity is a range from the official list, not a last login timestamp. Membership and activity reflect the directory date above. Sources: <a href="https://www.nexusatlas.com/userlist.php">Nexus Atlas index</a> and the linked official lists.</p></footer>
+  <script src="common.js"></script>
+  <script src="directory.js"></script>
+</body>
+</html>
