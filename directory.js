@@ -32,15 +32,14 @@
     { id: "registration", label: "Registration", options: REGISTRATION },
   ];
   const COLUMNS = [
+    { id: "rank", label: "#", sortLabel: "official rank", number: true },
+    { id: "pathRank", label: "Path #", number: true },
+    { id: "mark", label: "Mark", defaultDesc: true },
+    { id: "subpath", label: "Subpath", text: true },
     { id: "name", label: "Player", text: true },
     { id: "power", label: "Power", number: true },
     { id: "vita", label: "Vita", number: true },
     { id: "mana", label: "Mana", number: true },
-    { id: "rank", label: "Official #", number: true },
-    { id: "pathRank", label: "Path #", number: true },
-    { id: "path", label: "Path", text: true },
-    { id: "subpath", label: "Subpath", text: true },
-    { id: "mark", label: "Mark", defaultDesc: true },
     { id: "clan", label: "Clan", text: true },
     { id: "lastActive", label: "Last active", defaultDesc: true },
     { id: "gap", label: "To next", number: true },
@@ -94,7 +93,7 @@
     if (!file || (type !== "marks" && !ICONS[type].has(name))) return null;
     return el("img", { class: type === "marks" ? "mark-icon" : type === "subpaths" ? "subpath-icon" : "player-icon",
       src: `assets/${type}/${file}.${type === "paths" ? "gif" : "png"}`,
-      alt: type === "marks" || type === "subpaths" ? name : "", title: type === "marks" || type === "subpaths" ? name : "", loading: "lazy" });
+      alt: name, title: name, loading: "lazy" });
   }
 
   function values(row, field) {
@@ -160,9 +159,9 @@
         sortKey = col.id;
         shown = PAGE_SIZE;
         render();
-      }, "aria-label": `Sort by ${col.label}${active ? (sortDir > 0 ? ", ascending" : ", descending") : ""}` },
+      }, "aria-label": `Sort by ${col.sortLabel || col.label}${active ? (sortDir > 0 ? ", ascending" : ", descending") : ""}` },
       col.label, active ? el("span", { class: "arrow" }, sortDir > 0 ? "▲" : "▼") : "");
-      tr.append(el("th", { class: `${col.number ? "num " : ""}sortable${active ? " active" : ""}` }, button));
+      tr.append(el("th", { class: `${col.number ? "num " : ""}sortable${active ? " active" : ""}`, title: col.sortLabel || "" }, button));
     }
     document.getElementById("directory-head").replaceChildren(tr);
   }
@@ -177,13 +176,14 @@
     const mark = el("td", {}, icon("marks", row.mark) || row.mark || "—");
     const path = row.path ? pathName(row.path) : null;
     return el("tr", { class: row.tracked ? "tracked" : "" },
+      el("td", { class: "num", title: "Official Top 1000 rank" }, row.rank != null ? fmt(row.rank) : "—"),
+      el("td", { class: "num path-rank", title: row.pathRank != null ? `${path} Top 250 rank` : path ? `${path} path${row.inferredPath ? " inferred from subpath" : ""}; no current path rank` : "Path unknown" },
+        row.pathRank != null ? fmt(row.pathRank) : "—", path ? " " : "", path ? icon("paths", path) : ""),
+      mark, subpath,
       player,
       el("td", { class: "num", title: powerTitle }, evidenceText(e)),
       el("td", { class: "num", title: row.stats ? `Stats checked ${row.stats.date}` : "" }, sortValue(row, "vita") != null ? fmt(sortValue(row, "vita")) : "—"),
       el("td", { class: "num", title: row.stats ? `Stats checked ${row.stats.date}` : "" }, sortValue(row, "mana") != null ? fmt(sortValue(row, "mana")) : "—"),
-      el("td", { class: "num" }, row.rank != null ? `#${row.rank}` : "—"),
-      el("td", { class: "num" }, row.pathRank != null ? `#${row.pathRank}` : "—"),
-      el("td", { title: row.inferredPath ? "Path inferred from the listed subpath" : "" }, path ? icon("paths", path) : "", path || "—"), subpath, mark,
       el("td", {}, row.clans.join(", ") || "—"),
       el("td", { title: row.lastActive.title }, row.lastActive.label),
       el("td", { class: "num" }, row.today?.next?.gap != null ? fmt(row.today.next.gap) : "—"));
