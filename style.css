@@ -111,6 +111,8 @@ code { font-size: 0.9em; }
 .player-board thead th:first-child { z-index: 3; background: #f0f2f5; }
 .player-board tr.tracked td:first-child { background: #eef2ff; }
 .player-board td { vertical-align: middle; }
+.player-board .path-rank { white-space: nowrap; }
+.path-rank .player-icon { margin: 0 0 0 3px; }
 .player-board th button { white-space: nowrap; }
 .toolbar select {
   padding: 7px 10px;

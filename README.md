@@ -16,8 +16,9 @@ The **Tracker** (`index.html`) follows selected characters over time.
 **Players** (`directory.html`) joins the official Top 1000 and per-path Top 250
 with the A–Z character indexes and the clan/subpath lists linked from
 [Nexus Atlas](https://www.nexusatlas.com/userlist.php). Its columns sort by
-name, numeric power, vita, mana, official and path rank, path, subpath, mark,
-clan, last observed active date and power to next. Checkbox menus filter multiple
+official and path rank, mark, subpath, name, numeric power, vita, mana,
+clan, last observed active date and power to next. The path icon sits beside
+the path rank; path remains available as a filter. Checkbox menus filter multiple
 values within each category, including activity and registration even though
 these are no longer separate columns. Subpaths display icons only, with names
 available on hover and to screen readers. Power evidence is
