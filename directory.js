@@ -80,12 +80,7 @@
 
   function evidenceText(e) {
     if (e.value != null) return `${fmt(e.value)}${e.kind === "Last known" ? " (last known)" : ""}`;
-    if (e.kind === "Rank bounds") {
-      if (e.hi == null) return `≥ ${fmt(e.lo)}`;
-      if (e.lo <= 0) return `≤ ${fmt(e.hi)}`;
-      return `${fmt(e.lo)}–${fmt(e.hi)}`;
-    }
-    return e.lo != null ? `≥ ${fmt(e.lo)}` : "—";
+    return "-";
   }
 
   function icon(type, name) {
