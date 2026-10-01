@@ -80,12 +80,16 @@
 
   function evidenceText(e) {
     if (e.value != null) return `${fmt(e.value)}${e.kind === "Last known" ? " (last known)" : ""}`;
-    if (e.kind === "Rank bounds") {
-      if (e.hi == null) return `≥ ${fmt(e.lo)}`;
-      if (e.lo <= 0) return `≤ ${fmt(e.hi)}`;
-      return `${fmt(e.lo)}–${fmt(e.hi)}`;
-    }
+    // Two-sided bounds show only the minimum to keep the column narrow; the
+    // full range is in the cell's tooltip.
+    if (e.kind === "Rank bounds" && e.lo <= 0) return `≤ ${fmt(e.hi)}`;
     return e.lo != null ? `≥ ${fmt(e.lo)}` : "—";
+  }
+
+  function boundsText(e) {
+    if (e.hi == null) return `at least ${fmt(e.lo)}`;
+    if (e.lo <= 0) return `at most ${fmt(e.hi)}`;
+    return `between ${fmt(e.lo)} and ${fmt(e.hi)}`;
   }
 
   function icon(type, name) {
@@ -170,7 +174,7 @@
     const e = row.evidence;
     const player = el("td", { class: "player", title: row.sources.join(" · ") }, link(row.key, row.name));
     if (row.tracked) player.append(" ", el("a", { class: "chart-link", href: `./#p=${encodeURIComponent(row.key)}` }, "chart"));
-    const powerTitle = e.value != null ? `Vita + 2 × mana, checked ${e.date}` : e.kind === "Rank bounds" ? "Inferred from neighbours on the overall ranking" : e.kind === "Mark minimum" ? `Minimum inferred from ${row.mark}` : "No public power evidence";
+    const powerTitle = e.value != null ? `Vita + 2 × mana, checked ${e.date}` : e.kind === "Rank bounds" ? `Inferred from neighbours on the overall ranking: ${boundsText(e)}` : e.kind === "Mark minimum" ? `Minimum inferred from ${row.mark}` : "No public power evidence";
     const subpath = el("td", { title: row.subpaths.join(", ") }, ...row.subpaths.map((name) => icon("subpaths", name)).filter(Boolean));
     if (!row.subpaths.length) subpath.append("—");
     const mark = el("td", {}, icon("marks", row.mark) || row.mark || "—");

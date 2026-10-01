@@ -24,6 +24,8 @@ these are no longer separate columns. Subpaths display icons only, with names
 available on hover and to screen readers. Power evidence is
 separated into observed values, last-known values, ranking bounds, mark
 minimums and unknowns; sorting never treats a minimum as an exact stat.
+Ranking bounds show only the lower bound (`≥`) to keep the column narrow, with
+the full range on hover.
 The four path icons are copied locally from Nexus Atlas. Mark and subpath
 icons are supplied by the site owner; four NPC subpath icons are also included
 for future directory coverage. The [subpath index](https://www.nexusatlas.com/subpaths/index.php)
