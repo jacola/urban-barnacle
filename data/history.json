@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-10-10T07:07:29+00:00",
+ "generated_at": "2026-10-11T07:09:00+00:00",
  "source": "http://users.nexustk.com/webreport/PowerAll.htm",
  "power_formula": "vita + 2 * mana",
- "snapshots": 31,
+ "snapshots": 32,
  "tracked": [
   "inkey",
   "aero"
@@ -693,6 +693,28 @@
      "real_rank_max": 87,
      "path": "poet",
      "path_rank": 25
+    },
+    {
+     "date": "2026-10-11",
+     "rank": 79,
+     "power": 7563400,
+     "vita": 2601950,
+     "mana": 2480725,
+     "lo": 7563400,
+     "hi": 7563400,
+     "next": {
+      "rank": 77,
+      "key": "kydra",
+      "name": "Kydra",
+      "power": 7632464,
+      "skipped": 1,
+      "gap": 69064
+     },
+     "unregistered_above": 8,
+     "real_rank": 87,
+     "real_rank_max": 87,
+     "path": "poet",
+     "path_rank": 25
     }
    ]
   },
@@ -1375,6 +1397,28 @@
       "power": 6712665,
       "skipped": 1,
       "gap": 61738
+     },
+     "unregistered_above": 11,
+     "real_rank": 117,
+     "real_rank_max": 117,
+     "path": "rogue",
+     "path_rank": 17
+    },
+    {
+     "date": "2026-10-11",
+     "rank": 106,
+     "power": 6656657,
+     "vita": 3271211,
+     "mana": 1692723,
+     "lo": 6656657,
+     "hi": 6656657,
+     "next": {
+      "rank": 104,
+      "key": "missflyn",
+      "name": "MissFlyn",
+      "power": 6712665,
+      "skipped": 1,
+      "gap": 56008
      },
      "unregistered_above": 11,
      "real_rank": 117,
