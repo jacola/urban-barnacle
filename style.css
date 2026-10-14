@@ -294,6 +294,7 @@ footer p { margin: 0 0 8px; }
 .board th:first-child, .board td:first-child { padding-left: 14px; }
 .board th:last-child, .board td:last-child { padding-right: 14px; }
 .board .num { text-align: right; }
+.board .stale-stat { color: var(--muted); }
 .board thead th { position: sticky; top: 0; background: #f0f2f5; z-index: 1; }
 .board thead tr th:first-child { border-top-left-radius: 10px; }
 .board thead tr th:last-child { border-top-right-radius: 10px; }

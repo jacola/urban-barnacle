@@ -253,7 +253,12 @@ def parse_directory_names(text):
         key = urllib.parse.unquote(key).lower()
         display = html.unescape(re.sub(r"<[^>]+>", "", label)).strip()
         if re.fullmatch(r"[a-z0-9_]+", key):
-            result[key] = {"name": display.split()[-1], "title": " ".join(display.split()[:-1])}
+            title = " ".join(display.split()[:-1])
+            result[key] = {"name": display.split()[-1], "title": title}
+            promotion = re.fullmatch(r"(Il San|Ee San|Sam San|Sa San)\s+\(([WRMP])\)", title, re.I)
+            if promotion:
+                result[key]["level_mark"] = promotion.group(1).title()
+                result[key]["path"] = {"w": "warrior", "r": "rogue", "m": "mage", "p": "poet"}[promotion.group(2).lower()]
     return result
 
 
@@ -317,6 +322,9 @@ def cmd_directory(args):
             if source.startswith("letter-"):
                 entry["name"] = info["name"]
                 entry["title"] = info["title"]
+                for field in ("level_mark", "path"):
+                    if field in info:
+                        entry[field] = info[field]
             else:
                 group = "clans" if source.startswith("clan-") else "subpaths"
                 entry[group].append(source.split("-", 1)[1].replace("_", " "))
