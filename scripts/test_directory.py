@@ -19,6 +19,20 @@ class DirectoryParserTests(unittest.TestCase):
         self.assertEqual(parsed["lapin"]["level_mark"], "Il San")
         self.assertEqual(parsed["lapin"]["registration"], "registered")
 
+    def test_standard_promotion_titles_supply_mark_and_path(self):
+        for letter, path in (("W", "warrior"), ("R", "rogue"), ("M", "mage"), ("P", "poet")):
+            for mark in ("Il San", "Ee San", "Sam San", "Sa San"):
+                with self.subTest(mark=mark, path=path):
+                    page = f'<a href="http://users.nexustk.com/?name=ohyes">{mark} ({letter}) ohyes</a>'
+                    entry = parse_directory_names(page)["ohyes"]
+                    self.assertEqual(entry["name"], "ohyes")
+                    self.assertEqual(entry["level_mark"], mark)
+                    self.assertEqual(entry["path"], path)
+
+    def test_custom_titles_do_not_imply_a_mark(self):
+        page = '<a href="http://users.nexustk.com/?name=ohyes">Sa San Fan ohyes</a>'
+        self.assertNotIn("level_mark", parse_directory_names(page)["ohyes"])
+
 
 if __name__ == "__main__":
     unittest.main()

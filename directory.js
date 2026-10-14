@@ -14,7 +14,7 @@
   };
   const ACTIVITY = ["active", "inactive", "absent", UNKNOWN];
   const REGISTRATION = ["registered", "unregistered", UNKNOWN];
-  const EVIDENCE = ["Observed", "Last known", "Rank bounds", "Mark minimum", UNKNOWN];
+  const EVIDENCE = ["Observed", UNKNOWN];
   const RANKING = ["Top 1000", "Path Top 250 only", "Outside rankings"];
   const ICONS = {
     marks: { "Il San": "il", "Ee San": "ee", "Sam San": "sam", "Sa San": "sa" },
@@ -67,29 +67,20 @@
 
   function evidence(row) {
     if (row.today?.power != null) return { kind: "Observed", value: row.today.power, date: rankingDate };
-    if (row.stats) return { kind: row.stats.date < directoryDate ? "Last known" : "Observed", value: row.stats.power, date: row.stats.date };
-    // Ranking bounds are possible power values, not a measured stat.
-    const lo = row.today?.lo;
-    const hi = row.today?.hi;
-    if (row.rank != null && (lo > 0 || hi != null)) {
-      return { kind: "Rank bounds", lo: Math.max(lo || 0, row.min_power || 0), hi };
-    }
-    if (row.min_power != null) return { kind: "Mark minimum", lo: row.min_power };
+    if (row.stats?.power != null && row.stats.date >= directoryDate) return { kind: "Observed", value: row.stats.power, date: row.stats.date };
+    // Bounds, mark minima and cached stats do not establish observed power.
     return { kind: UNKNOWN };
   }
 
   function evidenceText(e) {
-    if (e.value != null) return `${fmt(e.value)}${e.kind === "Last known" ? " (last known)" : ""}`;
-    // Two-sided bounds show only the minimum to keep the column narrow; the
-    // full range is in the cell's tooltip.
-    if (e.kind === "Rank bounds" && e.lo <= 0) return `≤ ${fmt(e.hi)}`;
-    return e.lo != null ? `≥ ${fmt(e.lo)}` : "—";
+    return e.value != null ? fmt(e.value) : "-";
   }
 
-  function boundsText(e) {
-    if (e.hi == null) return `at least ${fmt(e.lo)}`;
-    if (e.lo <= 0) return `at most ${fmt(e.hi)}`;
-    return `between ${fmt(e.lo)} and ${fmt(e.hi)}`;
+  function statClass(date) {
+    const now = new Date();
+    const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const checked = Date.parse(date);
+    return today - checked > 5 * 86400000 ? "num stale-stat" : "num";
   }
 
   function icon(type, name) {
@@ -123,7 +114,7 @@
   function sortValue(row, key) {
     switch (key) {
       case "name": return row.name;
-      case "power": return row.evidence.value ?? row.evidence.lo ?? row.evidence.hi ?? null;
+      case "power": return row.evidence.value ?? null;
       case "vita": return row.today?.vita ?? row.stats?.vita ?? null;
       case "mana": return row.today?.mana ?? row.stats?.mana ?? null;
       case "rank": return row.rank;
@@ -139,10 +130,9 @@
   }
 
   function compare(a, b) {
-    // Exact and last-known figures, bounds, and minima cannot be interleaved as
-    // if all three represented a measured current value.
+    // Keep unknown power after observed figures in either sort direction.
     if (sortKey === "power") {
-      const order = { Observed: 0, "Last known": 1, "Rank bounds": 2, "Mark minimum": 3, [UNKNOWN]: 4 };
+      const order = { Observed: 0, [UNKNOWN]: 1 };
       const group = order[a.evidence.kind] - order[b.evidence.kind];
       if (group) return group;
     }
@@ -174,7 +164,9 @@
     const e = row.evidence;
     const player = el("td", { class: "player", title: row.sources.join(" · ") }, link(row.key, row.name));
     if (row.tracked) player.append(" ", el("a", { class: "chart-link", href: `./#p=${encodeURIComponent(row.key)}` }, "chart"));
-    const powerTitle = e.value != null ? `Vita + 2 × mana, checked ${e.date}` : e.kind === "Rank bounds" ? `Inferred from neighbours on the overall ranking: ${boundsText(e)}` : e.kind === "Mark minimum" ? `Minimum inferred from ${row.mark}` : "No public power evidence";
+    const powerTitle = e.value != null ? `Vita + 2 × mana, checked ${e.date}` : "Current power unknown";
+    const vitaDate = row.today?.vita != null ? rankingDate : row.stats?.date;
+    const manaDate = row.today?.mana != null ? rankingDate : row.stats?.date;
     const subpath = el("td", { title: row.subpaths.join(", ") }, ...row.subpaths.map((name) => icon("subpaths", name)).filter(Boolean));
     if (!row.subpaths.length) subpath.append("—");
     const mark = el("td", {}, icon("marks", row.mark) || row.mark || "—");
@@ -185,9 +177,9 @@
         row.pathRank != null ? fmt(row.pathRank) : "—", path ? " " : "", path ? icon("paths", path) : ""),
       mark, subpath,
       player,
-      el("td", { class: "num", title: powerTitle }, evidenceText(e)),
-      el("td", { class: "num", title: row.stats ? `Stats checked ${row.stats.date}` : "" }, sortValue(row, "vita") != null ? fmt(sortValue(row, "vita")) : "—"),
-      el("td", { class: "num", title: row.stats ? `Stats checked ${row.stats.date}` : "" }, sortValue(row, "mana") != null ? fmt(sortValue(row, "mana")) : "—"),
+      el("td", { class: statClass(e.date), title: powerTitle }, evidenceText(e)),
+      el("td", { class: statClass(vitaDate), title: vitaDate ? `Stats checked ${vitaDate}` : "" }, sortValue(row, "vita") != null ? fmt(sortValue(row, "vita")) : "—"),
+      el("td", { class: statClass(manaDate), title: manaDate ? `Stats checked ${manaDate}` : "" }, sortValue(row, "mana") != null ? fmt(sortValue(row, "mana")) : "—"),
       el("td", {}, row.clans.join(", ") || "—"),
       el("td", { title: row.lastActive.title }, row.lastActive.label),
       el("td", { class: "num" }, row.today?.next?.gap != null ? fmt(row.today.next.gap) : "—"));
@@ -306,6 +298,9 @@
       const keys = new Set([...Object.keys(directory.entries), ...Object.keys(ranked.players)]);
       rows = [...keys].map((key) => {
         const entry = directory.entries[key] || {};
+        const promotion = /^(Il San|Ee San|Sam San|Sa San)\s+\(([WRMP])\)$/i.exec(entry.title || "");
+        const titleMark = promotion ? MARKS.find((mark) => mark.toLowerCase() === promotion[1].toLowerCase()) : null;
+        const titlePath = promotion ? { w: "warrior", r: "rogue", m: "mage", p: "poet" }[promotion[2].toLowerCase()] : null;
         const p = ranked.players[key];
         const today = p?.today;
         const stats = [p?.stats, entry.stats].filter(Boolean).sort((a, b) => b.date.localeCompare(a.date))[0];
@@ -313,12 +308,12 @@
         const mappedPaths = [...new Set(subpaths.map((name) => SUBPATH_PATH[name]).filter(Boolean))];
         const inferredPath = !today?.path_rank && mappedPaths.length === 1;
         const row = {
-          key, name: entry.name || p?.name || key, mark: entry.level_mark,
+          key, name: entry.name || p?.name || key, mark: entry.level_mark ?? titleMark,
           min_power: entry.min_power, activity: entry.activity,
           registration: entry.registration ?? ((entry.sources || []).some((source) => source.startsWith("letter-")) || today?.rank != null || today?.path_rank != null ? "registered" : null),
           clans: entry.clans || [], subpaths,
           sources: (entry.sources || []).map((source) => directory.source_urls?.[source] || source),
-          path: inferredPath ? mappedPaths[0] : p?.path, inferredPath,
+          path: p?.path || entry.path || titlePath || (inferredPath ? mappedPaths[0] : null), inferredPath: !p?.path && !entry.path && !titlePath && inferredPath,
           rank: today?.rank, pathRank: today?.path_rank,
           today, stats, tracked: tracked.has(key),
         };
