@@ -22,12 +22,10 @@ the path rank; path remains available as a filter. Checkbox menus filter multipl
 values within each category, including activity and registration even though
 these are no longer separate columns. Subpaths display icons only, with names
 available on hover and to screen readers. Power evidence is
-separated into observed values, ranking bounds, mark
-minimums and unknowns; sorting never treats a minimum as an exact stat.
-Power figures display without inequality symbols or a “last known” suffix.
-Unknown current power displays `-` instead of a cached last-known value.
-Ranking bounds show the lower bound (or the upper bound when no positive lower
-bound is available), with the source, check date and full range on hover.
+separated into observed values and unknowns. Only observed power is displayed;
+unknown, cached last-known power, ranking bounds and mark minimums display `-`.
+Power figures have no inequality symbols or “last known” suffix. Hover over
+observed power for its check date. Unknown values sort after observed values.
 Power, vita and mana turn grey when their check date is more than five days old;
 newer figures keep the normal text color.
 The four path icons are copied locally from Nexus Atlas. Mark and subpath

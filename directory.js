@@ -14,7 +14,7 @@
   };
   const ACTIVITY = ["active", "inactive", "absent", UNKNOWN];
   const REGISTRATION = ["registered", "unregistered", UNKNOWN];
-  const EVIDENCE = ["Observed", "Rank bounds", "Mark minimum", UNKNOWN];
+  const EVIDENCE = ["Observed", UNKNOWN];
   const RANKING = ["Top 1000", "Path Top 250 only", "Outside rankings"];
   const ICONS = {
     marks: { "Il San": "il", "Ee San": "ee", "Sam San": "sam", "Sa San": "sa" },
@@ -68,24 +68,12 @@
   function evidence(row) {
     if (row.today?.power != null) return { kind: "Observed", value: row.today.power, date: rankingDate };
     if (row.stats?.power != null && row.stats.date >= directoryDate) return { kind: "Observed", value: row.stats.power, date: row.stats.date };
-    // Cached stats cannot establish current power when it is no longer visible.
-    if (row.stats?.power != null) return { kind: UNKNOWN };
-    // Ranking bounds are possible power values, not a measured stat.
-    const lo = row.today?.lo;
-    const hi = row.today?.hi;
-    if (row.rank != null && (lo > 0 || hi != null)) {
-      return { kind: "Rank bounds", lo: Math.max(lo || 0, row.min_power || 0), hi, date: rankingDate };
-    }
-    if (row.min_power != null) return { kind: "Mark minimum", lo: row.min_power, date: directoryDate };
+    // Bounds, mark minima and cached stats do not establish observed power.
     return { kind: UNKNOWN };
   }
 
   function evidenceText(e) {
-    if (e.value != null) return fmt(e.value);
-    // Two-sided bounds show only the minimum to keep the column narrow; the
-    // full range is in the cell's tooltip.
-    if (e.kind === "Rank bounds" && e.lo <= 0) return fmt(e.hi);
-    return e.lo != null ? fmt(e.lo) : "-";
+    return e.value != null ? fmt(e.value) : "-";
   }
 
   function statClass(date) {
@@ -93,12 +81,6 @@
     const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
     const checked = Date.parse(date);
     return today - checked > 5 * 86400000 ? "num stale-stat" : "num";
-  }
-
-  function boundsText(e) {
-    if (e.hi == null) return `at least ${fmt(e.lo)}`;
-    if (e.lo <= 0) return `at most ${fmt(e.hi)}`;
-    return `between ${fmt(e.lo)} and ${fmt(e.hi)}`;
   }
 
   function icon(type, name) {
@@ -132,7 +114,7 @@
   function sortValue(row, key) {
     switch (key) {
       case "name": return row.name;
-      case "power": return row.evidence.value ?? row.evidence.lo ?? row.evidence.hi ?? null;
+      case "power": return row.evidence.value ?? null;
       case "vita": return row.today?.vita ?? row.stats?.vita ?? null;
       case "mana": return row.today?.mana ?? row.stats?.mana ?? null;
       case "rank": return row.rank;
@@ -148,10 +130,9 @@
   }
 
   function compare(a, b) {
-    // Exact figures, bounds, and minima cannot be interleaved as
-    // if all three represented a measured current value.
+    // Keep unknown power after observed figures in either sort direction.
     if (sortKey === "power") {
-      const order = { Observed: 0, "Rank bounds": 1, "Mark minimum": 2, [UNKNOWN]: 3 };
+      const order = { Observed: 0, [UNKNOWN]: 1 };
       const group = order[a.evidence.kind] - order[b.evidence.kind];
       if (group) return group;
     }
@@ -183,7 +164,7 @@
     const e = row.evidence;
     const player = el("td", { class: "player", title: row.sources.join(" · ") }, link(row.key, row.name));
     if (row.tracked) player.append(" ", el("a", { class: "chart-link", href: `./#p=${encodeURIComponent(row.key)}` }, "chart"));
-    const powerTitle = e.value != null ? `Vita + 2 × mana, checked ${e.date}` : e.kind === "Rank bounds" ? `Inferred from neighbours on the overall ranking: ${boundsText(e)}, checked ${e.date}` : e.kind === "Mark minimum" ? `Minimum inferred from ${row.mark}, checked ${e.date}` : "Current power unknown";
+    const powerTitle = e.value != null ? `Vita + 2 × mana, checked ${e.date}` : "Current power unknown";
     const vitaDate = row.today?.vita != null ? rankingDate : row.stats?.date;
     const manaDate = row.today?.mana != null ? rankingDate : row.stats?.date;
     const subpath = el("td", { title: row.subpaths.join(", ") }, ...row.subpaths.map((name) => icon("subpaths", name)).filter(Boolean));
