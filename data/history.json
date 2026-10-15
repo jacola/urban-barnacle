@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-10-14T07:08:38+00:00",
+ "generated_at": "2026-10-15T07:10:10+00:00",
  "source": "http://users.nexustk.com/webreport/PowerAll.htm",
  "power_formula": "vita + 2 * mana",
- "snapshots": 35,
+ "snapshots": 36,
  "tracked": [
   "inkey",
   "aero"
@@ -781,6 +781,28 @@
      "real_rank_max": 87,
      "path": "poet",
      "path_rank": 24
+    },
+    {
+     "date": "2026-10-15",
+     "rank": 77,
+     "power": 7609960,
+     "vita": 2602560,
+     "mana": 2503700,
+     "lo": 7609960,
+     "hi": 7609960,
+     "next": {
+      "rank": 75,
+      "key": "kydra",
+      "name": "Kydra",
+      "power": 7632464,
+      "skipped": 1,
+      "gap": 22504
+     },
+     "unregistered_above": 10,
+     "real_rank": 87,
+     "real_rank_max": 87,
+     "path": "poet",
+     "path_rank": 23
     }
    ]
   },
@@ -1555,6 +1577,28 @@
      "unregistered_above": 13,
      "real_rank": 116,
      "real_rank_max": 116,
+     "path": "rogue",
+     "path_rank": 16
+    },
+    {
+     "date": "2026-10-15",
+     "rank": 101,
+     "power": 6722387,
+     "vita": 3271391,
+     "mana": 1725498,
+     "lo": 6722387,
+     "hi": 6722387,
+     "next": {
+      "rank": 96,
+      "key": "gzagenius",
+      "name": "GzaGenius",
+      "power": 6881011,
+      "skipped": 4,
+      "gap": 158624
+     },
+     "unregistered_above": 14,
+     "real_rank": 115,
+     "real_rank_max": 115,
      "path": "rogue",
      "path_rank": 16
     }
