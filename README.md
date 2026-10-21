@@ -40,7 +40,8 @@ The old `rankings.html` address redirects to the chart on Players.
 * **Search box** – type a name to add any character who has ever appeared on
   the list; press **×** on a card to remove it. The selection is kept in the
   URL (`#p=inkey,aero`) and in the browser, so links are shareable.
-  *Reset to defaults* restores the characters listed in `config.json`.
+  *Reset to defaults* restores the characters listed in `config.json`
+  (currently empty). Previously saved browser selections are kept.
 * **Overall / Within path** – switches the cards, the "to pass" tables and
   the chart between the overall Top 1000 and the character's path Top 250
   (Warriors, Rogues, Mages, Poets). Kept in the URL as `view=path`.
@@ -101,7 +102,9 @@ power.
 2. **Settings → Pages**: Source "Deploy from a branch", branch `main`, folder `/ (root)`.
 3. **Actions** tab: run "Daily ranking snapshot" once via *Run workflow* to
    confirm it works (it takes ~20 minutes because of the character lookups).
-   Afterwards it runs every day at 06:23 UTC.
+   Afterwards it is scheduled every day at 06:00 JST (21:00 UTC on the
+   previous day). GitHub Actions may delay scheduled starts, and fetching
+   takes about 20 minutes, so updated data appears after the job finishes.
 
 The site is then served at `https://<user>.github.io/<repo>/`.
 
@@ -113,7 +116,7 @@ The site is then served at `https://<user>.github.io/<repo>/`.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `tracked` | – | Characters selected by default on the site; their stats and neighbours are always looked up first, and they get a readable record in `history.json`. Add or remove names at any time; `build` back-fills from the archived snapshots. |
+| `tracked` | `[]` | Characters selected by default on the site; an empty list starts with no selection. Their stats and neighbours are always looked up first, and they get a readable record in `history.json`. Add or remove names at any time; `build` back-fills from the archived snapshots. |
 | `request_delay_seconds` | `1.0` | Pause between requests to the site. |
 | `stats_refresh_days` | `1` | Re-fetch a character page only if the last lookup is at least this many days old. |
 | `max_lookups_per_run` | `1100` | Safety cap on character lookups per run (tracked characters and their neighbours are always looked up first). |

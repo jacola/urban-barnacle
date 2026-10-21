@@ -113,8 +113,10 @@ def rel(path):
 def load_config():
     with CONFIG_PATH.open(encoding="utf-8") as fh:
         cfg = {**DEFAULTS, **json.load(fh)}
-    if not cfg.get("tracked"):
-        sys.exit("config.json: 'tracked' must list at least one character name")
+    if not isinstance(cfg.get("tracked"), list) or any(
+        not isinstance(name, str) or not name.strip() for name in cfg["tracked"]
+    ):
+        sys.exit("config.json: 'tracked' must be a list of non-empty character names (may be empty)")
     return cfg
 
 

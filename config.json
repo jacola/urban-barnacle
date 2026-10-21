@@ -1,5 +1,5 @@
 {
-  "tracked": ["Inkey", "Aero"],
+  "tracked": [],
   "request_delay_seconds": 1.0,
   "stats_refresh_days": 1,
   "max_lookups_per_run": 1100,

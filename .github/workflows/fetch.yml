@@ -2,8 +2,8 @@ name: Daily ranking snapshot
 
 on:
   schedule:
-    # 06:23 UTC daily (off the hour to avoid GitHub's peak scheduler load).
-    - cron: "23 6 * * *"
+    # 06:00 JST daily = 21:00 UTC on the previous day.
+    - cron: "0 21 * * *"
   workflow_dispatch:
 
 permissions:
