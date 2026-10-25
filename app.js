@@ -6,7 +6,7 @@
   const STORAGE_KEY = "powerrank.selected";
   const VIEW_KEY = "powerrank.view";
   const CHART_RANGE_KEY = "powerrank.chartRange";
-  const CHART_RANGE_DAYS = { "1w": 7, "1m": 30, "1y": 365 };
+  const CHART_RANGE_DAYS = { "1w": 7, "1m": 30, "2m": 60, "3m": 90, "1y": 365 };
   const TABLE_ROWS = 30;
   const NEXT_ROWS = 5;
 
@@ -465,6 +465,7 @@
     const visibleDates = dates.map((date, i) => ({ date, i })).filter(({ date }) => date >= cutoff);
     const datasets = [];
     const values = [];
+    let firstWithData = null;
 
     selected.forEach((key, index) => {
       const p = player(key);
@@ -476,7 +477,11 @@
         }
         return { x: date, y: viewRankOn(p, i) };
       });
-      points.forEach((pt) => pt.y != null && values.push(pt.y));
+      points.forEach((pt) => {
+        if (pt.y == null) return;
+        values.push(pt.y);
+        if (firstWithData == null || pt.x < firstWithData) firstWithData = pt.x;
+      });
       datasets.push({
         label: showReal ? `${p.name} (real)` : inPath && p.path ? `${p.name} (${pathName(p.path)})` : p.name,
         data: points,
@@ -493,6 +498,8 @@
     const maxRank = values.length ? Math.max(...values) : 100;
     const step = maxRank <= 30 ? 5 : maxRank <= 150 ? 10 : maxRank <= 400 ? 25 : maxRank <= 700 ? 50 : 100;
     const yMax = Math.ceil((maxRank + 2) / step) * step;
+    // Start the axis at the earliest plotted point rather than an empty stretch before data began.
+    const xMin = firstWithData ?? (visibleDates.length ? visibleDates[0].date : latest);
     const ticks = [1];
     for (let value = step; value <= yMax; value += step) ticks.push(value);
 
@@ -508,7 +515,7 @@
         scales: {
           x: {
             type: "time",
-            min: cutoff,
+            min: xMin,
             max: latest,
             time: { minUnit: "day", tooltipFormat: "yyyy-MM-dd" },
             ticks: { maxRotation: 0, autoSkipPadding: 16 },

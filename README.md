@@ -49,8 +49,9 @@ The old `rankings.html` address redirects to the chart on Players.
   real rank (with the list of unregistered players above), the nearest five
   better-ranked players with visible stats and the power needed to pass each,
   and the character's stats.
-* **Chart** – rank over time (1 at the top) for the last 7, 30 or 365 days
-  of snapshots (1w / 1m / 1y); the selected period is remembered. In the
+* **Chart** – rank over time (1 at the top) for the last 7, 30, 60, 90 or 365 days
+  of snapshots (1w / 1m / 2m / 3m / 1y), starting no earlier than the first
+  date with data; the selected period is remembered. In the
   overall view, *Show real rank* replaces the official-rank lines with
   real-rank lines.
 * **History table** – overall rank, path rank, real rank and power to next
