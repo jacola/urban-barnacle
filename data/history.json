@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-11-17T21:26:33+00:00",
+ "generated_at": "2026-11-18T21:30:44+00:00",
  "source": "http://users.nexustk.com/webreport/PowerAll.htm",
  "power_formula": "vita + 2 * mana",
- "snapshots": 69,
+ "snapshots": 70,
  "tracked": [],
  "players": {}
 }
